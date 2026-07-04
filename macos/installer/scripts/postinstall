@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+APP_PATH="/Applications/TextPad.app"
+
+if [ -d "$APP_PATH" ]; then
+  /usr/bin/xattr -cr "$APP_PATH" 2>/dev/null || true
+  /usr/bin/chmod -R a+rX "$APP_PATH" 2>/dev/null || true
+fi
+
+exit 0

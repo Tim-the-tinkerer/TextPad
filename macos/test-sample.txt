@@ -1,0 +1,5 @@
+Hello from TextPad!
+This is line 2.
+function test() {
+    return 42;
+}

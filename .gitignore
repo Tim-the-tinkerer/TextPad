@@ -1,0 +1,69 @@
+# =============================================================================
+# TextPad — macOS & Windows
+# =============================================================================
+
+# --- macOS build outputs ---
+macos/.build/
+macos/TextPad.app/
+macos/dist/
+macos/icon.iconset/
+macos/AppIcon.icns
+macos/installer/pkg-work/
+macos/installer/dmg-work/
+
+# --- Windows build outputs ---
+windows-x64/dist/
+windows-x64/TextPad/bin/
+windows-x64/TextPad/obj/
+
+# Downloaded build tools (Inno Setup, etc.)
+windows-x64/tools/
+
+# Local/dev scratch
+windows-x64/_dump_colors.cs
+
+# --- .NET / Visual Studio ---
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+.vs/
+*.rsuser
+
+# --- macOS / Finder ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Windows Explorer ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+
+# --- Editors & IDEs ---
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# --- Logs & temp files ---
+*.log
+*.tmp
+*.temp
+*.bak
+
+# --- Code signing / secrets (never commit) ---
+*.p12
+*.pfx
+*.mobileprovision
+signing.config
+.env
+.env.*
