@@ -51,6 +51,9 @@ echo "Version: $VERSION (build $BUILD)"
 echo "Architecture: $ARCH_LABEL"
 echo ""
 
+# Ensure resource files (especially AppIcon.icns) are world-readable in installers.
+chmod -R a+rX "$APP_PATH"
+
 # --- PKG installer (copies to /Applications) ---
 echo "Creating PKG installer..."
 

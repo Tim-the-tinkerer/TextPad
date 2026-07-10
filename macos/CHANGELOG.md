@@ -1,5 +1,16 @@
 # TextPad (macOS) Changelog
 
+## 1.5.3 — 2026-07-10
+
+Version aligned with Windows 1.5.3.
+
+### Fixed
+- App icon missing in Finder after install: `AppIcon.icns` is now packaged with world-readable permissions.
+- RTF receipts and other email-style documents with light gray text on white table cells now render with readable contrast in all themes.
+- RTF table layout from Mail and similar sources is preserved when opening rich-text documents.
+- Plain-text files with unrecognized encodings (including some binary and Synology `.enclave` key files) open with an ISO Latin-1 fallback instead of failing with “Unable to decode file encoding.”
+- The Open dialog accepts all file types, not only common text UTIs.
+
 ## 1.5.2 — 2026-07-04
 
 Version aligned with Windows 1.5.2.

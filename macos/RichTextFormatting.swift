@@ -3,7 +3,7 @@ import AppKit
 enum RichTextFormatting {
     static func configure(_ textView: NSTextView, richText: Bool) {
         textView.isRichText = richText
-        textView.importsGraphics = false
+        textView.importsGraphics = richText
         textView.allowsDocumentBackgroundColorChange = richText
         textView.usesFontPanel = richText
         textView.isAutomaticLinkDetectionEnabled = richText
@@ -48,16 +48,41 @@ enum RichTextFormatting {
         var index = 0
         while index < fullRange.length {
             var effectiveRange = NSRange()
-            let existing = storage.attribute(.foregroundColor, at: index, effectiveRange: &effectiveRange)
-            if existing == nil || shouldRemapForeground(existing as? NSColor, for: theme) {
-                storage.addAttribute(.foregroundColor, value: theme.text, range: effectiveRange)
+            let existing = storage.attribute(.foregroundColor, at: index, effectiveRange: &effectiveRange) as? NSColor
+            let resolved = resolvedDocumentColor(existing, for: theme)
+            let components = colorComponents(resolved ?? theme.text)
+            let bgLuminance = effectiveBackgroundLuminance(
+                at: index,
+                in: storage,
+                editorBackground: theme.background
+            )
+
+            if shouldNormalizeForeground(
+                components: components,
+                backgroundLuminance: bgLuminance,
+                theme: theme
+            ) {
+                storage.addAttribute(
+                    .foregroundColor,
+                    value: preferredTextColor(forBackgroundLuminance: bgLuminance, theme: theme),
+                    range: effectiveRange
+                )
+            } else if let resolved {
+                storage.addAttribute(.foregroundColor, value: resolved, range: effectiveRange)
             }
+
+            storage.removeAttribute(.strokeColor, range: effectiveRange)
+            storage.removeAttribute(.strokeWidth, range: effectiveRange)
             index = NSMaxRange(effectiveRange)
         }
 
         storage.enumerateAttribute(.backgroundColor, in: fullRange) { value, range, _ in
-            guard let color = value as? NSColor, shouldRemapHighlight(color, for: theme) else { return }
-            storage.addAttribute(.backgroundColor, value: theme.selection, range: range)
+            guard let color = value as? NSColor else { return }
+            if shouldRemapHighlight(color, for: theme) {
+                storage.addAttribute(.backgroundColor, value: theme.selection, range: range)
+            } else if shouldRemapDocumentBackground(color, for: theme) {
+                storage.addAttribute(.backgroundColor, value: theme.uiControlBackground, range: range)
+            }
         }
 
         storage.enumerateAttribute(.link, in: fullRange) { value, range, _ in
@@ -68,25 +93,102 @@ enum RichTextFormatting {
         storage.endEditing()
     }
 
-    private static func shouldRemapForeground(_ color: NSColor?, for theme: EditorTheme) -> Bool {
-        guard let rgb = (color ?? .black).usingColorSpace(.sRGB) else { return true }
+    private struct ColorComponents {
+        let red: CGFloat
+        let green: CGFloat
+        let blue: CGFloat
+        let alpha: CGFloat
+        let saturation: CGFloat
+        let luminance: CGFloat
+    }
+
+    private static func colorComponents(_ color: NSColor) -> ColorComponents {
+        let rgb = color.usingColorSpace(.sRGB) ?? color
         var r: CGFloat = 0
         var g: CGFloat = 0
         var b: CGFloat = 0
         var alpha: CGFloat = 0
         rgb.getRed(&r, green: &g, blue: &b, alpha: &alpha)
-
         let maxChannel = max(r, g, b)
         let minChannel = min(r, g, b)
         let saturation = maxChannel == 0 ? 0 : (maxChannel - minChannel) / maxChannel
         let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return ColorComponents(
+            red: r,
+            green: g,
+            blue: b,
+            alpha: alpha,
+            saturation: saturation,
+            luminance: luminance
+        )
+    }
 
-        if saturation > 0.18 { return false }
+    private static func resolvedDocumentColor(_ color: NSColor?, for theme: EditorTheme) -> NSColor? {
+        guard let color else { return nil }
+        let appearance = NSAppearance(named: theme.isDark ? .darkAqua : .aqua) ?? NSApp.effectiveAppearance
+        var resolved = color
+        appearance.performAsCurrentDrawingAppearance {
+            resolved = color.usingColorSpace(.sRGB) ?? color
+        }
+        return resolved
+    }
+
+    private static func effectiveBackgroundLuminance(
+        at index: Int,
+        in storage: NSTextStorage,
+        editorBackground: NSColor
+    ) -> CGFloat {
+        if let background = storage.attribute(.backgroundColor, at: index, effectiveRange: nil) as? NSColor {
+            let components = colorComponents(background)
+            if components.alpha > 0.2 {
+                return components.luminance
+            }
+        }
+
+        if let paragraph = storage.attribute(.paragraphStyle, at: index, effectiveRange: nil) as? NSParagraphStyle,
+           !paragraph.textBlocks.isEmpty {
+            return 0.95
+        }
+
+        return colorComponents(editorBackground).luminance
+    }
+
+    private static func contrastRatio(foreground: CGFloat, background: CGFloat) -> CGFloat {
+        let lighter = max(foreground, background) + 0.05
+        let darker = min(foreground, background) + 0.05
+        return lighter / darker
+    }
+
+    private static func shouldNormalizeForeground(
+        components: ColorComponents,
+        backgroundLuminance: CGFloat,
+        theme: EditorTheme
+    ) -> Bool {
+        if components.saturation > 0.18 {
+            return false
+        }
+
+        let contrast = contrastRatio(foreground: components.luminance, background: backgroundLuminance)
+        if contrast < 3.0 {
+            return true
+        }
+
+        if backgroundLuminance > 0.6 {
+            return components.luminance > 0.3
+        }
 
         if theme.isDark {
-            return luminance < 0.55
+            return components.luminance < 0.55 && backgroundLuminance < 0.5
         }
-        return luminance > 0.65
+
+        return false
+    }
+
+    private static func preferredTextColor(forBackgroundLuminance backgroundLuminance: CGFloat, theme: EditorTheme) -> NSColor {
+        if backgroundLuminance > 0.6 {
+            return EditorTheme.light.text
+        }
+        return theme.text
     }
 
     private static func shouldRemapHighlight(_ color: NSColor, for theme: EditorTheme) -> Bool {
@@ -96,12 +198,39 @@ enum RichTextFormatting {
         var b: CGFloat = 0
         var alpha: CGFloat = 0
         rgb.getRed(&r, green: &g, blue: &b, alpha: &alpha)
+        guard alpha > 0.2 else { return false }
+
+        let maxChannel = max(r, g, b)
+        let minChannel = min(r, g, b)
+        let saturation = maxChannel == 0 ? 0 : (maxChannel - minChannel) / maxChannel
         let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
 
-        if theme.isDark {
-            return luminance < 0.22 && alpha > 0.2
+        // Preserve neutral table and document backgrounds (common in email receipts).
+        if saturation < 0.12 {
+            return false
         }
-        return luminance > 0.92 && alpha > 0.2
+
+        if theme.isDark {
+            return luminance < 0.22
+        }
+        return luminance > 0.92
+    }
+
+    private static func shouldRemapDocumentBackground(_ color: NSColor, for theme: EditorTheme) -> Bool {
+        guard theme.isDark else { return false }
+        guard let rgb = color.usingColorSpace(.sRGB) else { return false }
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var alpha: CGFloat = 0
+        rgb.getRed(&r, green: &g, blue: &b, alpha: &alpha)
+        guard alpha > 0.2 else { return false }
+
+        let maxChannel = max(r, g, b)
+        let minChannel = min(r, g, b)
+        let saturation = maxChannel == 0 ? 0 : (maxChannel - minChannel) / maxChannel
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return saturation < 0.12 && luminance > 0.55
     }
 
     static func rtfData(from textView: NSTextView) -> Data? {

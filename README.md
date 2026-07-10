@@ -2,7 +2,7 @@
 
 A lightweight text editor for **macOS** and **Windows**, inspired by BBEdit and CotEditor. Both platforms share the same feature set: plain-text and rich-text editing, syntax highlighting, multi-tab workflows, large-file handling, and auto-save recovery.
 
-**Current version: 1.5.2**
+**Current version: 1.5.3**
 
 | Platform | Source | Technology |
 |----------|--------|------------|
@@ -88,8 +88,8 @@ Produces in `macos/dist/`:
 
 | File | Description |
 |------|-------------|
-| `TextPad-1.5.2-mac-arm64.dmg` | Drag-to-Applications disk image |
-| `TextPad-1.5.2-mac-arm64.pkg` | Guided installer (copies to `/Applications`) |
+| `TextPad-1.5.3-mac-arm64.dmg` | Drag-to-Applications disk image |
+| `TextPad-1.5.3-mac-arm64.pkg` | Guided installer (copies to `/Applications`) |
 
 On Intel Macs the architecture label is `x64` instead of `arm64`.
 
@@ -137,7 +137,7 @@ cd windows-x64
 .\build_installer.ps1
 ```
 
-Produces: `windows-x64\dist\TextPad-1.5.2-win-x64-Setup.exe`
+Produces: `windows-x64\dist\TextPad-1.5.3-win-x64-Setup.exe`
 
 Pass `-SkipSign` to skip code signing when no certificate is configured.
 

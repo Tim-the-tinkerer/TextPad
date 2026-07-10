@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using PdfSharp.Drawing;
+using PdfSharp.Fonts;
 using PdfSharp.Pdf;
 using TextPad.Models;
 
@@ -18,6 +19,14 @@ namespace TextPad.Services;
 public static class DocumentExport
 {
     private static readonly Size PageSize = new(816, 1056); // 8.5" x 11" at 96 DPI
+
+    /// <summary>
+    /// Rasterize FlowDocument pages at print quality. 96 DPI produces soft/blurry PDFs;
+    /// 300 DPI keeps text crisp when zoomed or printed.
+    /// </summary>
+    private const double PdfRenderDpi = 300;
+
+    private static int _fontsConfigured;
 
     public static void Print(FrameworkElement owner, string title, string plainText, RichTextBox? richEditor = null)
     {
@@ -146,23 +155,9 @@ public static class DocumentExport
                 }
             }
 
-            var document = PrepareForPagination(
-                BuildPlainFlowDocument(string.Empty, plainText ?? string.Empty, includeTitle: false));
-            try
-            {
-                ExportFlowDocumentToPdf(document, dialog.FileName, safeTitle);
-            }
-            catch (Exception flowExportError)
-            {
-                var window = owner as Window ?? Window.GetWindow(owner);
-                System.Windows.MessageBox.Show(
-                    window,
-                    $"Formatted PDF export failed. Saving as plain text instead.\n\n{flowExportError.Message}",
-                    "TextPad",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                SaveTextAsPdf(plainText ?? string.Empty, dialog.FileName, safeTitle);
-            }
+            // Plain text: draw real PDF text (vector fonts) — sharp at any zoom.
+            // FlowDocument rasterization at 96 DPI produced blurry, distorted pages.
+            SaveTextAsPdf(plainText ?? string.Empty, dialog.FileName, safeTitle);
             return true;
         }
         catch (Exception ex)
@@ -438,10 +433,41 @@ public static class DocumentExport
 
     private static void AddDocumentPageToPdf(PdfDocument pdf, DocumentPage documentPage)
     {
-        var width = Math.Max(1, (int)Math.Ceiling(PageSize.Width));
-        var height = Math.Max(1, (int)Math.Ceiling(PageSize.Height));
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(documentPage.Visual);
+        // Scale the page visual up to print DPI so text stays sharp in the PDF viewer.
+        var scale = PdfRenderDpi / 96.0;
+        var pixelWidth = Math.Max(1, (int)Math.Ceiling(PageSize.Width * scale));
+        var pixelHeight = Math.Max(1, (int)Math.Ceiling(PageSize.Height * scale));
+
+        var drawingVisual = new DrawingVisual();
+        using (var dc = drawingVisual.RenderOpen())
+        {
+            dc.PushTransform(new ScaleTransform(scale, scale));
+            dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, PageSize.Width, PageSize.Height));
+
+            // DocumentPage.Visual is already laid out in 96-DPI DIPs; paint it via a brush
+            // so we can scale without re-parenting the visual tree.
+            var pageBrush = new VisualBrush(documentPage.Visual)
+            {
+                Stretch = Stretch.None,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top,
+                Viewbox = new Rect(0, 0, PageSize.Width, PageSize.Height),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewport = new Rect(0, 0, PageSize.Width, PageSize.Height),
+                ViewportUnits = BrushMappingMode.Absolute
+            };
+            dc.DrawRectangle(pageBrush, null, new Rect(0, 0, PageSize.Width, PageSize.Height));
+            dc.Pop();
+        }
+
+        var bitmap = new RenderTargetBitmap(
+            pixelWidth,
+            pixelHeight,
+            PdfRenderDpi,
+            PdfRenderDpi,
+            PixelFormats.Pbgra32);
+        bitmap.Render(drawingVisual);
+        bitmap.Freeze();
 
         using var imageStream = new MemoryStream();
         var encoder = new PngBitmapEncoder();
@@ -454,6 +480,7 @@ public static class DocumentExport
 
         using var gfx = XGraphics.FromPdfPage(pdfPage);
         using var image = XImage.FromStream(imageStream);
+        // Fill the letter page exactly — source and target share the same aspect ratio.
         gfx.DrawImage(image, 0, 0, pdfPage.Width.Point, pdfPage.Height.Point);
     }
 
@@ -487,14 +514,16 @@ public static class DocumentExport
         var pdf = new PdfDocument();
         pdf.Info.Title = title;
 
+        // Prefer a monospaced face for plain-text fidelity; fall back gracefully.
         var bodyFont = CreateFont(prefs.FontFamily, prefs.FontSize, XFontStyleEx.Regular);
         var page = pdf.AddPage();
         page.Size = PdfSharp.PageSize.Letter;
 
         var gfx = XGraphics.FromPdfPage(page);
-        var y = 48.0;
-        var maxWidth = page.Width.Point - 96;
-        var lineHeight = bodyFont.GetHeight();
+        const double margin = 48.0;
+        var y = margin;
+        var maxWidth = page.Width.Point - margin * 2;
+        var lineHeight = bodyFont.GetHeight() * 1.15;
         var tabSpaces = new string(' ', prefs.TabWidth);
 
         var normalized = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
@@ -504,32 +533,272 @@ public static class DocumentExport
         foreach (var rawLine in normalized.Split('\n'))
         {
             var line = rawLine.Replace("\t", tabSpaces);
-            if (y > page.Height.Point - 48 - lineHeight)
+            foreach (var wrapped in WrapTextLine(gfx, line, bodyFont, maxWidth))
             {
-                gfx.Dispose();
-                page = pdf.AddPage();
-                page.Size = PdfSharp.PageSize.Letter;
-                gfx = XGraphics.FromPdfPage(page);
-                y = 48;
-            }
+                if (y > page.Height.Point - margin - lineHeight)
+                {
+                    gfx.Dispose();
+                    page = pdf.AddPage();
+                    page.Size = PdfSharp.PageSize.Letter;
+                    gfx = XGraphics.FromPdfPage(page);
+                    y = margin;
+                }
 
-            gfx.DrawString(line, bodyFont, XBrushes.Black, new XRect(48, y, maxWidth, lineHeight), XStringFormats.TopLeft);
-            y += lineHeight;
+                gfx.DrawString(
+                    wrapped,
+                    bodyFont,
+                    XBrushes.Black,
+                    new XRect(margin, y, maxWidth, lineHeight),
+                    XStringFormats.TopLeft);
+                y += lineHeight;
+            }
         }
 
         gfx.Dispose();
         AtomicFileWriter.SavePdf(pdf, filePath);
     }
 
+    /// <summary>
+    /// Word-wrap a single logical line to fit <paramref name="maxWidth"/>, breaking long
+    /// tokens by character when needed (code, URLs, license keys).
+    /// </summary>
+    private static IEnumerable<string> WrapTextLine(XGraphics gfx, string line, XFont font, double maxWidth)
+    {
+        if (line.Length == 0)
+        {
+            yield return " ";
+            yield break;
+        }
+
+        if (gfx.MeasureString(line, font).Width <= maxWidth)
+        {
+            yield return line;
+            yield break;
+        }
+
+        var words = SplitPreservingSpaces(line);
+        var current = new StringBuilder();
+
+        foreach (var word in words)
+        {
+            var candidate = current.Length == 0 ? word : current + word;
+            if (gfx.MeasureString(candidate, font).Width <= maxWidth)
+            {
+                current.Append(word);
+                continue;
+            }
+
+            if (current.Length > 0)
+            {
+                yield return current.ToString();
+                current.Clear();
+            }
+
+            // Word itself is wider than the line — break by character.
+            if (gfx.MeasureString(word, font).Width > maxWidth)
+            {
+                foreach (var chunk in BreakByCharacter(gfx, word, font, maxWidth))
+                    yield return chunk;
+            }
+            else
+            {
+                current.Append(word);
+            }
+        }
+
+        if (current.Length > 0)
+            yield return current.ToString();
+    }
+
+    private static List<string> SplitPreservingSpaces(string line)
+    {
+        var parts = new List<string>();
+        var i = 0;
+        while (i < line.Length)
+        {
+            if (char.IsWhiteSpace(line[i]))
+            {
+                var start = i;
+                while (i < line.Length && char.IsWhiteSpace(line[i]))
+                    i++;
+                parts.Add(line[start..i]);
+            }
+            else
+            {
+                var start = i;
+                while (i < line.Length && !char.IsWhiteSpace(line[i]))
+                    i++;
+                parts.Add(line[start..i]);
+            }
+        }
+
+        return parts;
+    }
+
+    private static IEnumerable<string> BreakByCharacter(XGraphics gfx, string text, XFont font, double maxWidth)
+    {
+        if (text.Length == 0)
+        {
+            yield return " ";
+            yield break;
+        }
+
+        var start = 0;
+        while (start < text.Length)
+        {
+            var end = start + 1;
+            while (end < text.Length &&
+                   gfx.MeasureString(text[start..(end + 1)], font).Width <= maxWidth)
+            {
+                end++;
+            }
+
+            yield return text[start..end];
+            start = end;
+        }
+    }
+
     private static XFont CreateFont(string family, double size, XFontStyleEx style)
     {
+        EnsurePdfFontsConfigured();
+
+        foreach (var candidate in FontFamilyCandidates(family))
+        {
+            try
+            {
+                return new XFont(candidate, size, style);
+            }
+            catch
+            {
+                // try next candidate
+            }
+        }
+
+        // Last resort — WindowsSystemFontResolver always maps this face.
+        return new XFont("Arial", size, style);
+    }
+
+    private static IEnumerable<string> FontFamilyCandidates(string family)
+    {
+        if (!string.IsNullOrWhiteSpace(family))
+            yield return family.Trim();
+
+        yield return "Consolas";
+        yield return "Cascadia Mono";
+        yield return "Cascadia Code";
+        yield return "Courier New";
+        yield return "Segoe UI";
+        yield return "Arial";
+    }
+
+    private static void EnsurePdfFontsConfigured()
+    {
+        if (Interlocked.Exchange(ref _fontsConfigured, 1) == 1)
+            return;
+
         try
         {
-            return new XFont(family, size, style);
+            // PDFsharp 6 Core build has no built-in Windows font access unless configured.
+            GlobalFontSettings.FontResolver = new WindowsSystemFontResolver();
         }
         catch
         {
-            return new XFont("Consolas", size, style);
+            // Already configured elsewhere — leave as-is.
+            try
+            {
+                GlobalFontSettings.UseWindowsFontsUnderWindows = true;
+            }
+            catch
+            {
+                // Ignore; CreateFont will surface a clearer error if fonts truly fail.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads TrueType/OpenType faces from the Windows Fonts folder for PDFsharp Core.
+    /// </summary>
+    private sealed class WindowsSystemFontResolver : IFontResolver
+    {
+        private static readonly string FontsDirectory =
+            Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+
+        // family (lower) → (regular, bold, italic, boldItalic) file names
+        private static readonly Dictionary<string, string[]> KnownFamilies =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Arial"] = ["arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"],
+                ["Times New Roman"] = ["times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf"],
+                ["Courier New"] = ["cour.ttf", "courbd.ttf", "couri.ttf", "courbi.ttf"],
+                ["Verdana"] = ["verdana.ttf", "verdanab.ttf", "verdanai.ttf", "verdanaz.ttf"],
+                ["Tahoma"] = ["tahoma.ttf", "tahomabd.ttf", "tahoma.ttf", "tahomabd.ttf"],
+                ["Segoe UI"] = ["segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf"],
+                ["Consolas"] = ["consola.ttf", "consolab.ttf", "consolai.ttf", "consolaz.ttf"],
+                ["Cascadia Mono"] = ["CascadiaMono.ttf", "CascadiaMono.ttf", "CascadiaMono.ttf", "CascadiaMono.ttf"],
+                ["Cascadia Code"] = ["CascadiaCode.ttf", "CascadiaCode.ttf", "CascadiaCode.ttf", "CascadiaCode.ttf"],
+                ["Lucida Console"] = ["lucon.ttf", "lucon.ttf", "lucon.ttf", "lucon.ttf"],
+                ["Calibri"] = ["calibri.ttf", "calibrib.ttf", "calibrii.ttf", "calibriz.ttf"],
+                ["Cambria"] = ["cambria.ttc", "cambriab.ttf", "cambriai.ttf", "cambriaz.ttf"],
+            };
+
+        public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic)
+        {
+            var path = ResolveFontFile(familyName, isBold, isItalic)
+                       ?? ResolveFontFile("Arial", isBold, isItalic)
+                       ?? ResolveFontFile("Consolas", false, false);
+            if (path is null || !File.Exists(path))
+                return null;
+
+            // Face name is the absolute path; GetFont reads those bytes.
+            return new FontResolverInfo(path);
+        }
+
+        public byte[] GetFont(string faceName)
+        {
+            if (string.IsNullOrWhiteSpace(faceName) || !File.Exists(faceName))
+                return Array.Empty<byte>();
+
+            return File.ReadAllBytes(faceName);
+        }
+
+        private static string? ResolveFontFile(string familyName, bool isBold, bool isItalic)
+        {
+            if (string.IsNullOrWhiteSpace(familyName))
+                return null;
+
+            var styleIndex = (isBold ? 1 : 0) + (isItalic ? 2 : 0);
+
+            if (KnownFamilies.TryGetValue(familyName.Trim(), out var files))
+            {
+                var preferred = Path.Combine(FontsDirectory, files[styleIndex]);
+                if (File.Exists(preferred))
+                    return preferred;
+
+                // Fall back within the family to regular if a style is missing.
+                var regular = Path.Combine(FontsDirectory, files[0]);
+                if (File.Exists(regular))
+                    return regular;
+            }
+
+            // Heuristic: match file names that start with the family (no spaces).
+            var stem = familyName.Replace(" ", "", StringComparison.Ordinal).ToLowerInvariant();
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(FontsDirectory, "*.ttf")
+                             .Concat(Directory.EnumerateFiles(FontsDirectory, "*.otf")))
+                {
+                    var name = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+                    if (name.StartsWith(stem, StringComparison.Ordinal) ||
+                        name.Equals(stem, StringComparison.Ordinal))
+                        return file;
+                }
+            }
+            catch
+            {
+                // Fonts folder inaccessible
+            }
+
+            return null;
         }
     }
 

@@ -28,5 +28,6 @@ make_icon icon_base.png 512 "$ICONSET/icon_512x512.png"
 make_icon icon_base.png 1024 "$ICONSET/icon_512x512@2x.png"
 
 iconutil -c icns "$ICONSET" -o AppIcon.icns
+chmod 644 AppIcon.icns
 
 echo "Created AppIcon.icns"

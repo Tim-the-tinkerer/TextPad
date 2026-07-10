@@ -183,7 +183,8 @@ enum DocumentEncodingSupport {
             }
         }
 
-        return nil
+        // Match Windows behavior: open undecodable bytes as ISO Latin-1 rather than failing.
+        return .isoLatin1
     }
 
     static func stripBOM(from data: Data, encoding: String.Encoding) -> Data {

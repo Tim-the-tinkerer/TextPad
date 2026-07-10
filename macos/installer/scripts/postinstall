@@ -6,6 +6,9 @@ APP_PATH="/Applications/TextPad.app"
 if [ -d "$APP_PATH" ]; then
   /usr/bin/xattr -cr "$APP_PATH" 2>/dev/null || true
   /usr/bin/chmod -R a+rX "$APP_PATH" 2>/dev/null || true
+  if [ -f "$APP_PATH/Contents/Resources/AppIcon.icns" ]; then
+    /usr/bin/chmod a+r "$APP_PATH/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+  fi
 fi
 
 exit 0

@@ -271,6 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
+        panel.allowsOtherFileTypes = true
         panel.allowedContentTypes = [.plainText, .rtf, .sourceCode, .json, .html, .xml, .script, .data]
         panel.begin { response in
             guard response == .OK else { return }
@@ -314,6 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
+        panel.allowsOtherFileTypes = true
         panel.allowedContentTypes = [.plainText, .sourceCode, .json, .html, .xml, .script, .data]
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
@@ -738,7 +740,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.2"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.3"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "TextPad",
             .applicationVersion: version,

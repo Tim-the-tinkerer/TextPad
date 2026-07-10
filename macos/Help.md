@@ -36,8 +36,8 @@ Only one TextPad instance runs at a time. Launching TextPad again (or opening fi
 
 ### Supported formats
 
-- **Plain text** — Any text file; encoding detected or chosen on open.
-- **Rich text (RTF)** — Opened and edited with full formatting. Use Format → Make Plain Text to convert to plain text.
+- **Plain text** — Any text file; encoding detected or chosen on open. If detection fails, TextPad falls back to ISO Latin-1 so unusual or binary files can still be opened.
+- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables. Text colors are adjusted for readable contrast in your chosen theme. Use Format → Make Plain Text to convert to plain text.
 
 ### Character encodings
 
@@ -262,7 +262,10 @@ Paths with spaces should be quoted. Additional launches forward files to the run
 This is intentional. Files are sent to the already-running instance.
 
 **Garbled or wrong characters**  
-Use File → Open with Encoding and pick the correct encoding, or File → Document Encoding on an open file.
+Use File → Open with Encoding and pick the correct encoding, or File → Document Encoding on an open file. For uncommon extensions, choose **All Files** in the Open dialog if needed.
+
+**RTF text is faint or hard to read**  
+Email receipts and similar RTF files often use light gray on white. TextPad normalizes low-contrast text automatically; try switching themes if colors still look wrong.
 
 **Selection is hard to see**  
 TextPad uses distinct colors for text selection and the current-line highlight. You can turn off the current-line highlight in View → Toggle Current Line Highlight or in Preferences.

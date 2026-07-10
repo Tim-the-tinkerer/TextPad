@@ -93,11 +93,15 @@ cp Info.plist "$APP_DIR/Contents/Info.plist"
 
 if [ -f AppIcon.icns ]; then
   cp AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
+  chmod 644 "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
 if [ -f Help.md ]; then
   cp Help.md "$APP_DIR/Contents/Resources/Help.md"
+  chmod 644 "$APP_DIR/Contents/Resources/Help.md"
 fi
+
+chmod a+rX "$APP_DIR/Contents/Resources"
 
 # Code signing
 # Set SIGN_IDENTITY to a keychain identity (e.g. "Developer ID Application: Your Name (TEAMID)")

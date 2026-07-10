@@ -1,5 +1,18 @@
 # TextPad (Windows) Changelog
 
+## 1.5.3 — 2026-07-10
+
+Version aligned with macOS 1.5.3.
+
+### Fixed
+- RTF receipts and other email-style documents with light gray text on white table cells now render with readable contrast in all themes, including content inside table cells.
+- Cocoa/email RTF documents with nested tables (e.g. FastSpring receipts saved from macOS TextEdit) no longer render as a broken side-by-side layout. Nested tables are flattened into a readable top-to-bottom flow; simple two-column rows such as product | price are preserved.
+- Near-black body text with a slight color bias (common in Cocoa RTF, e.g. `#0D0D12`) is remapped for contrast on dark themes instead of being treated as an intentional accent.
+- Transparent table cells no longer assume a white page background when remapping text colors, which left receipt body text unreadable on dark themes.
+- Hyperlinks keep the theme accent color; nested RTF span colors no longer override it. Low-contrast saturated accents (such as price reds) are brightened on dark themes.
+- Export as PDF for plain text now embeds real fonts (vector text) instead of a soft 96‑DPI page screenshot, so text stays sharp when zoomed or printed. Long lines wrap to the page width.
+- Export as PDF for rich text renders pages at 300 DPI instead of 96 DPI, reducing blur and distortion.
+
 ## 1.5.2 — 2026-07-04
 
 ### Added
