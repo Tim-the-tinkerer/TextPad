@@ -282,14 +282,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func openFile(at url: URL) {
-        let doc = EditorDocument()
-        do {
-            try doc.load(from: url)
-        } catch {
-            showError("Could not open file", error.localizedDescription)
-            return
+        DispatchQueue.global(qos: .userInitiated).async {
+            let doc = EditorDocument()
+            do {
+                try doc.load(from: url)
+                DispatchQueue.main.async { self.presentDocument(doc) }
+            } catch {
+                DispatchQueue.main.async {
+                    self.showError("Could not open file", error.localizedDescription)
+                }
+            }
         }
-        presentDocument(doc)
     }
 
     func presentDocument(_ doc: EditorDocument) {
@@ -321,13 +324,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard response == .OK, let url = panel.url else { return }
             let controller = EncodingOptionsController(mode: .open)
             controller.show { encoding, policy in
-                let doc = EditorDocument()
-                do {
-                    try doc.load(from: url, encoding: encoding)
-                    doc.lineEndingPolicy = policy
-                    self.presentDocument(doc)
-                } catch {
-                    self.showError("Could not open file", error.localizedDescription)
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let doc = EditorDocument()
+                    do {
+                        try doc.load(from: url, encoding: encoding)
+                        doc.lineEndingPolicy = policy
+                        DispatchQueue.main.async { self.presentDocument(doc) }
+                    } catch {
+                        DispatchQueue.main.async {
+                            self.showError("Could not open file", error.localizedDescription)
+                        }
+                    }
                 }
             }
         }
@@ -435,7 +442,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try editor.document.revert()
-            editor.reloadFromDocument()
+            editor.reloadFromDocument(force: true)
             editor.delegate?.editorDidChange(editor)
             activeWindow()?.updateWindowTitle()
         } catch {
@@ -740,7 +747,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.3"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.5"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "TextPad",
             .applicationVersion: version,
@@ -830,6 +837,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 }
 
 // MARK: - Helpers exposed to AppDelegate
-
-
-

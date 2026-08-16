@@ -38,7 +38,7 @@ Only one TextPad window runs at a time. Opening TextPad again (or double-clickin
 ### Supported formats
 
 - **Plain text** — Any text file; encoding detected or chosen on open. Unrecognized encodings fall back to Windows Latin-1 (CP-1252) so unusual files can still be opened.
-- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables. Text colors are adjusted for readable contrast in your chosen theme. Use Format → Make Plain Text to convert to plain text.
+- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables and the fonts named in the document. The editor theme does not replace those fonts. Ink that is too close to the paper color is darkened so the page stays readable. Use Format → Make Plain Text to convert to plain text.
 
 ### Character encodings
 
@@ -128,7 +128,7 @@ Open via **View → Preferences**.
 | Setting | Description |
 |---------|-------------|
 | Theme | Light, Dark, Solarized, Sepia, or follow Windows (System) |
-| Font | Editor font family (plain text) |
+| Font | Editor font family (plain text). Includes bundled Interlac and Interlac Unicode. |
 | Font size | 8–72 pt |
 | Tab width | Spaces per tab when converting tabs |
 | Line endings on save | Preserve, LF, or CRLF |
@@ -271,7 +271,7 @@ Use File → Open with Encoding and pick the correct encoding, or File → Docum
 Email receipts and similar RTF files often use light gray on white. TextPad normalizes low-contrast text automatically; try switching themes if colors still look wrong.
 
 **Slow or frozen on a huge file**  
-Very large single-line files use the large-file editor automatically. Wait for the loading title to clear.
+Very large and single-line files stay in the standard editor. TextPad automatically disables expensive presentation features when needed.
 
 **SmartScreen warning on the installer**  
 The installer may be unsigned or signed with a development certificate. Only install from a source you trust.

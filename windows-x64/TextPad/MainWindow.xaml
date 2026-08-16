@@ -41,9 +41,14 @@
                             <Border Grid.Row="0"
                                     Background="{DynamicResource TabBarBackgroundBrush}"
                                     Padding="8,6,8,0">
-                                <TabPanel IsItemsHost="True"
-                                          Background="Transparent"
-                                          HorizontalAlignment="Left"/>
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled"
+                                              CanContentScroll="False"
+                                              PanningMode="HorizontalOnly">
+                                    <TabPanel IsItemsHost="True"
+                                              Background="Transparent"
+                                              HorizontalAlignment="Left"/>
+                                </ScrollViewer>
                             </Border>
                             <Border Grid.Row="1"
                                     Background="{DynamicResource TabBarBackgroundBrush}"

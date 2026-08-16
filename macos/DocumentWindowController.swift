@@ -5,6 +5,15 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
     private var currentIndex = 0
     private var editorContainer = DropReceivingView()
     private var tabBarContainer = NSView()
+    private let tabScrollView = HorizontalTabScrollView()
+    private let newTabButton = NSButton(title: "", target: nil, action: nil)
+    private let overflowLeftButton = NSButton(title: "", target: nil, action: nil)
+    private let overflowRightButton = NSButton(title: "", target: nil, action: nil)
+    private let tabBarHeight: CGFloat = 32
+    private let tabTitleMaxWidth: CGFloat = 200
+    private let tabScrollStep: CGFloat = 180
+    private var overflowLeftWidth: NSLayoutConstraint!
+    private var overflowRightWidth: NSLayoutConstraint!
 
     var currentEditor: EditorViewController? {
         guard currentIndex >= 0, currentIndex < editors.count else { return nil }
@@ -30,14 +39,15 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
     private func setupUI() {
         guard let content = window?.contentView else { return }
 
-        tabBarContainer.frame = NSRect(x: 0, y: content.bounds.height - 32, width: content.bounds.width, height: 32)
+        tabBarContainer.frame = NSRect(x: 0, y: content.bounds.height - tabBarHeight, width: content.bounds.width, height: tabBarHeight)
         tabBarContainer.autoresizingMask = [.width, .minYMargin]
 
-        editorContainer.frame = NSRect(x: 0, y: 0, width: content.bounds.width, height: content.bounds.height - 32)
+        editorContainer.frame = NSRect(x: 0, y: 0, width: content.bounds.width, height: content.bounds.height - tabBarHeight)
         editorContainer.autoresizingMask = [.width, .height]
 
         content.addSubview(editorContainer)
         content.addSubview(tabBarContainer)
+        setupTabBarChrome()
 
         editorContainer.onFilesDropped = { urls in
             let delegate = NSApp.delegate as? AppDelegate
@@ -59,6 +69,64 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
         applyTabBarTheme()
     }
 
+    private func setupTabBarChrome() {
+        tabScrollView.drawsBackground = false
+        tabScrollView.borderType = .noBorder
+        tabScrollView.hasVerticalScroller = false
+        tabScrollView.hasHorizontalScroller = false
+        tabScrollView.autohidesScrollers = true
+        tabScrollView.verticalScrollElasticity = .none
+        tabScrollView.horizontalScrollElasticity = .allowed
+        tabScrollView.automaticallyAdjustsContentInsets = false
+        tabScrollView.contentInsets = .init()
+        tabScrollView.scrollerInsets = .init()
+        tabScrollView.translatesAutoresizingMaskIntoConstraints = false
+        tabScrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(tabStripDidScroll),
+            name: NSView.boundsDidChangeNotification,
+            object: tabScrollView.contentView
+        )
+
+        configureChromeButton(overflowLeftButton, title: "‹", tooltip: "Show earlier tabs", action: #selector(scrollTabsLeft))
+        configureChromeButton(overflowRightButton, title: "›", tooltip: "Show later tabs", action: #selector(scrollTabsRight))
+        configureChromeButton(newTabButton, title: "+", tooltip: "New Tab", action: #selector(newTab))
+
+        overflowLeftWidth = overflowLeftButton.widthAnchor.constraint(equalToConstant: 0)
+        overflowRightWidth = overflowRightButton.widthAnchor.constraint(equalToConstant: 0)
+
+        tabBarContainer.addSubview(overflowLeftButton)
+        tabBarContainer.addSubview(tabScrollView)
+        tabBarContainer.addSubview(overflowRightButton)
+        tabBarContainer.addSubview(newTabButton)
+        NSLayoutConstraint.activate([
+            overflowLeftButton.leadingAnchor.constraint(equalTo: tabBarContainer.leadingAnchor, constant: 4),
+            overflowLeftButton.centerYAnchor.constraint(equalTo: tabBarContainer.centerYAnchor),
+            overflowLeftWidth,
+            tabScrollView.leadingAnchor.constraint(equalTo: overflowLeftButton.trailingAnchor, constant: 2),
+            tabScrollView.topAnchor.constraint(equalTo: tabBarContainer.topAnchor),
+            tabScrollView.bottomAnchor.constraint(equalTo: tabBarContainer.bottomAnchor),
+            tabScrollView.trailingAnchor.constraint(equalTo: overflowRightButton.leadingAnchor, constant: -2),
+            overflowRightButton.trailingAnchor.constraint(equalTo: newTabButton.leadingAnchor, constant: -2),
+            overflowRightButton.centerYAnchor.constraint(equalTo: tabBarContainer.centerYAnchor),
+            overflowRightWidth,
+            newTabButton.trailingAnchor.constraint(equalTo: tabBarContainer.trailingAnchor, constant: -8),
+            newTabButton.centerYAnchor.constraint(equalTo: tabBarContainer.centerYAnchor)
+        ])
+    }
+
+    private func configureChromeButton(_ button: NSButton, title: String, tooltip: String, action: Selector) {
+        button.target = self
+        button.action = action
+        button.bezelStyle = .accessoryBar
+        button.toolTip = tooltip
+        button.attributedTitle = styledChromeTitle(title, size: 14)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.translatesAutoresizingMaskIntoConstraints = false
+    }
+
     @objc private func preferencesChanged() {
         refreshAppearance()
     }
@@ -71,15 +139,24 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
     private func applyTabBarTheme() {
         let theme = EditorPreferences.shared.effectiveTheme
         tabBarContainer.layer?.backgroundColor = theme.tabBarBackground.cgColor
+        newTabButton.attributedTitle = styledChromeTitle("+", size: 14)
+        newTabButton.contentTintColor = theme.tabText
+        overflowLeftButton.attributedTitle = styledChromeTitle("‹", size: 16)
+        overflowRightButton.attributedTitle = styledChromeTitle("›", size: 16)
+        overflowLeftButton.contentTintColor = theme.tabText
+        overflowRightButton.contentTintColor = theme.tabText
     }
 
     private func styledTabTitle(_ title: String, selected: Bool) -> NSAttributedString {
         let theme = EditorPreferences.shared.effectiveTheme
         let color = selected ? theme.tabTextSelected : theme.tabText
         let weight: NSFont.Weight = selected ? .semibold : .regular
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingMiddle
         return NSAttributedString(string: title, attributes: [
             .foregroundColor: color,
-            .font: NSFont.systemFont(ofSize: 12, weight: weight)
+            .font: NSFont.systemFont(ofSize: 12, weight: weight),
+            .paragraphStyle: paragraph
         ])
     }
 
@@ -99,12 +176,15 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
         guard let content = window?.contentView else { return }
         let w = content.bounds.width
         let h = content.bounds.height
-        tabBarContainer.frame = NSRect(x: 0, y: h - 32, width: w, height: 32)
-        editorContainer.frame = NSRect(x: 0, y: 0, width: w, height: h - 32)
+        tabBarContainer.frame = NSRect(x: 0, y: h - tabBarHeight, width: w, height: tabBarHeight)
+        editorContainer.frame = NSRect(x: 0, y: 0, width: w, height: h - tabBarHeight)
 
         if let editorView = currentEditor?.view {
             editorView.frame = editorContainer.bounds
         }
+        sizeTabStrip()
+        scrollSelectedTabIntoView()
+        updateOverflowControls()
     }
 
     @discardableResult
@@ -140,6 +220,7 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
         editor.document.fileURL = document.fileURL
         editor.document.content = document.content
         editor.document.encoding = document.encoding
+        editor.document.writesByteOrderMark = document.writesByteOrderMark
         editor.document.language = document.language
         editor.document.format = document.format
         editor.document.rtfData = document.rtfData
@@ -148,7 +229,7 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
         editor.document.documentID = document.documentID
         editor.document.isDirty = document.isDirty
         showEditor(at: 0)
-        editor.reloadFromDocument()
+        editor.reloadFromDocument(force: true)
         refreshTabBar()
         updateWindowTitle()
     }
@@ -216,30 +297,41 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
     }
 
     private func refreshTabBar() {
-        tabBarContainer.subviews.forEach { $0.removeFromSuperview() }
+        applyTabBarTheme()
 
         let stack = NSStackView()
         stack.orientation = .horizontal
         stack.alignment = .centerY
-        stack.distribution = .fill
+        stack.distribution = .gravityAreas
         stack.spacing = 4
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
 
         for (i, editor) in editors.enumerated() {
             let tabRow = NSStackView()
             tabRow.orientation = .horizontal
             tabRow.spacing = 2
-            tabRow.setHuggingPriority(.required, for: .horizontal)
+            tabRow.alignment = .centerY
+            tabRow.setHuggingPriority(.defaultHigh, for: .horizontal)
+            tabRow.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
             let isSelected = currentIndex == i
+            let title = editor.document.displayName
             let btn = NSButton(title: "", target: self, action: #selector(tabClicked(_:)))
             btn.tag = i
             btn.bezelStyle = .accessoryBar
             btn.setButtonType(.toggle)
             btn.state = isSelected ? .on : .off
-            btn.attributedTitle = styledTabTitle(editor.document.displayName, selected: isSelected)
-            btn.contentTintColor = isSelected ? EditorPreferences.shared.effectiveTheme.tabTextSelected : EditorPreferences.shared.effectiveTheme.tabText
-            btn.setContentHuggingPriority(.required, for: .horizontal)
+            btn.attributedTitle = styledTabTitle(title, selected: isSelected)
+            btn.contentTintColor = isSelected
+                ? EditorPreferences.shared.effectiveTheme.tabTextSelected
+                : EditorPreferences.shared.effectiveTheme.tabText
+            btn.toolTip = title
+            (btn.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingMiddle
+            (btn.cell as? NSButtonCell)?.wraps = false
+            (btn.cell as? NSButtonCell)?.truncatesLastVisibleLine = true
+            btn.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            btn.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            btn.widthAnchor.constraint(lessThanOrEqualToConstant: tabTitleMaxWidth).isActive = true
             tabRow.addArrangedSubview(btn)
 
             let closeBtn = NSButton(title: "", target: self, action: #selector(closeTabClicked(_:)))
@@ -250,26 +342,71 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
             closeBtn.contentTintColor = EditorPreferences.shared.effectiveTheme.tabText
             closeBtn.toolTip = "Close Tab"
             closeBtn.setContentHuggingPriority(.required, for: .horizontal)
+            closeBtn.setContentCompressionResistancePriority(.required, for: .horizontal)
             tabRow.addArrangedSubview(closeBtn)
 
             stack.addArrangedSubview(tabRow)
         }
 
-        let newTabBtn = NSButton(title: "", target: self, action: #selector(newTab))
-        newTabBtn.bezelStyle = .accessoryBar
-        newTabBtn.attributedTitle = styledChromeTitle("+", size: 14)
-        newTabBtn.contentTintColor = EditorPreferences.shared.effectiveTheme.tabText
-        newTabBtn.setContentHuggingPriority(.required, for: .horizontal)
-        stack.addArrangedSubview(newTabBtn)
+        tabScrollView.documentView = stack
+        sizeTabStrip()
+        scrollSelectedTabIntoView()
+        updateOverflowControls()
+    }
 
-        stack.setHuggingPriority(.required, for: .horizontal)
-        stack.setContentCompressionResistancePriority(.required, for: .horizontal)
+    private func sizeTabStrip() {
+        guard let stack = tabScrollView.documentView else { return }
+        stack.layoutSubtreeIfNeeded()
+        let fitted = stack.fittingSize
+        let viewport = tabScrollView.contentView.bounds
+        stack.setFrameSize(NSSize(
+            width: max(fitted.width, viewport.width),
+            height: tabBarHeight
+        ))
+    }
 
-        tabBarContainer.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: tabBarContainer.leadingAnchor, constant: 8),
-            stack.centerYAnchor.constraint(equalTo: tabBarContainer.centerYAnchor)
-        ])
+    private func scrollSelectedTabIntoView() {
+        guard let stack = tabScrollView.documentView as? NSStackView,
+              currentIndex >= 0,
+              currentIndex < stack.arrangedSubviews.count else { return }
+        let tab = stack.arrangedSubviews[currentIndex]
+        tab.layoutSubtreeIfNeeded()
+        tab.scrollToVisible(tab.bounds.insetBy(dx: -12, dy: 0))
+    }
+
+    @objc private func tabStripDidScroll() {
+        updateOverflowControls()
+    }
+
+    @objc private func scrollTabsLeft() {
+        scrollTabs(by: -tabScrollStep)
+    }
+
+    @objc private func scrollTabsRight() {
+        scrollTabs(by: tabScrollStep)
+    }
+
+    private func scrollTabs(by delta: CGFloat) {
+        let clip = tabScrollView.contentView
+        var origin = clip.bounds.origin
+        origin.x += delta
+        let maxX = max(0, (tabScrollView.documentView?.frame.width ?? 0) - clip.bounds.width)
+        origin.x = min(max(origin.x, 0), maxX)
+        clip.scroll(to: origin)
+        tabScrollView.reflectScrolledClipView(clip)
+        updateOverflowControls()
+    }
+
+    private func updateOverflowControls() {
+        let clip = tabScrollView.contentView.bounds
+        let documentWidth = tabScrollView.documentView?.frame.width ?? 0
+        let overflow = documentWidth > clip.width + 1
+        overflowLeftButton.isHidden = !overflow
+        overflowRightButton.isHidden = !overflow
+        overflowLeftWidth.constant = overflow ? 22 : 0
+        overflowRightWidth.constant = overflow ? 22 : 0
+        overflowLeftButton.isEnabled = clip.minX > 1
+        overflowRightButton.isEnabled = clip.maxX < documentWidth - 1
     }
 
     @objc private func tabClicked(_ sender: NSButton) {
@@ -320,4 +457,21 @@ final class DocumentWindowController: NSWindowController, EditorViewControllerDe
         confirmClose(editor: controller)
     }
 
+}
+
+/// Horizontal tab strip. Vertical wheel / swipe moves sideways so overflow
+/// tabs stay reachable without a permanent scrollbar.
+private final class HorizontalTabScrollView: NSScrollView {
+    override func scrollWheel(with event: NSEvent) {
+        let clip = contentView
+        var origin = clip.bounds.origin
+        let delta = abs(event.scrollingDeltaX) >= abs(event.scrollingDeltaY)
+            ? event.scrollingDeltaX
+            : event.scrollingDeltaY
+        origin.x -= event.hasPreciseScrollingDeltas ? delta : delta * 8
+        let maxX = max(0, (documentView?.frame.width ?? 0) - clip.bounds.width)
+        origin.x = min(max(origin.x, 0), maxX)
+        clip.scroll(to: origin)
+        reflectScrolledClipView(clip)
+    }
 }

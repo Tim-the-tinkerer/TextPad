@@ -9,6 +9,7 @@ final class EditorDocument: NSObject {
     var format: DocumentFormat = .plainText
     var isDirty = false
     var encoding: String.Encoding = .utf8
+    var writesByteOrderMark = false
     var language: SyntaxLanguage = .plain
     var lineEnding: LineEnding = .lf
     var lineEndingPolicy: LineEndingPolicy = .preserve
@@ -34,7 +35,7 @@ final class EditorDocument: NSObject {
         guard let url = fileURL else { return false }
         let ext = url.pathExtension.lowercased()
         if isRichText {
-            return ext == "rtf" || ext == "rtfd"
+            return ext == "rtf"
         }
         return ext != "rtf" && ext != "rtfd"
     }
@@ -47,9 +48,14 @@ final class EditorDocument: NSObject {
         return "Untitled." + ext
     }
 
-    static let maxLoadBytes = 100 * 1024 * 1024
+    static let maxLoadBytes = 256 * 1024 * 1024
 
     func load(from url: URL, encoding explicitEncoding: String.Encoding? = nil) throws {
+        if url.pathExtension.lowercased() == "rtfd" || url.hasDirectoryPath {
+            throw NSError(domain: "TextPad", code: 8, userInfo: [
+                NSLocalizedDescriptionKey: "RTFD packages are not supported. Open or export the document as a standard .rtf file."
+            ])
+        }
         let data = try SafeFileReader.readData(from: url)
         guard data.count <= Self.maxLoadBytes else {
             throw NSError(domain: "TextPad", code: 7, userInfo: [
@@ -66,17 +72,6 @@ final class EditorDocument: NSObject {
                 content = attributed.string
                 rtfData = data
                 encoding = .utf8
-            } else if let attributed = try? NSAttributedString(
-                data: data,
-                options: [.documentType: NSAttributedString.DocumentType.rtfd],
-                documentAttributes: nil
-            ) {
-                content = attributed.string
-                rtfData = try? attributed.data(
-                    from: NSRange(location: 0, length: attributed.length),
-                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
-                )
-                encoding = .utf8
             } else {
                 throw NSError(domain: "TextPad", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to read RTF file."])
             }
@@ -90,6 +85,7 @@ final class EditorDocument: NSObject {
             content = text
             rtfData = nil
             encoding = useEncoding
+            writesByteOrderMark = DocumentEncodingSupport.hasBOM(data, for: useEncoding)
             lineEnding = LineEnding.detect(in: text)
             lineEndingPolicy = EditorPreferences.shared.lineEndingOnSave
         }
@@ -103,6 +99,7 @@ final class EditorDocument: NSObject {
 
     func updateLineEndingIfNeeded(editedRange: NSRange, delta: Int, in text: String) {
         guard !isRichText else { return }
+        guard text.utf16.count <= LargeFileSupport.largeDocumentThreshold else { return }
         guard LineEnding.editMayAffectLineEndings(editedRange: editedRange, delta: delta, in: text as NSString) else {
             return
         }
@@ -129,7 +126,8 @@ final class EditorDocument: NSObject {
                 text,
                 encoding: encoding,
                 lineEndingPolicy: lineEndingPolicy,
-                originalLineEnding: lineEnding
+                originalLineEnding: lineEnding,
+                includeBOM: writesByteOrderMark
             ) else {
                 throw NSError(domain: "TextPad", code: 3, userInfo: [NSLocalizedDescriptionKey: "Unable to encode file."])
             }
@@ -181,7 +179,7 @@ final class EditorDocument: NSObject {
     private func validateSaveTarget(_ url: URL) throws {
         let ext = url.pathExtension.lowercased()
         if isRichText {
-            guard ext == "rtf" || ext == "rtfd" else {
+            guard ext == "rtf" else {
                 throw NSError(domain: "TextPad", code: 4, userInfo: [
                     NSLocalizedDescriptionKey: "Rich text documents must be saved with a .rtf extension."
                 ])
@@ -202,6 +200,7 @@ final class EditorDocument: NSObject {
         copy.format = format
         copy.isDirty = isDirty
         copy.encoding = encoding
+        copy.writesByteOrderMark = writesByteOrderMark
         copy.language = language
         copy.lineEnding = lineEnding
         copy.lineEndingPolicy = lineEndingPolicy
@@ -220,6 +219,7 @@ final class EditorDocument: NSObject {
         }
         document.format = DocumentFormat(rawValue: entry.format) ?? .plainText
         document.encoding = TextEncoding.supported.first { $0.name == entry.encodingName }?.encoding ?? .utf8
+        document.writesByteOrderMark = entry.writesByteOrderMark ?? false
         document.lineEnding = LineEnding(rawValue: entry.lineEnding) ?? .lf
         document.lineEndingPolicy = EditorPreferences.shared.lineEndingOnSave
         document.language = document.isRichText ? .plain : SyntaxLanguage.detect(from: document.fileURL)

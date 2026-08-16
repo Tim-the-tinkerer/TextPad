@@ -240,7 +240,7 @@ public static class DocumentExport
         var prefs = EditorPreferences.Instance;
         var document = new FlowDocument
         {
-            FontFamily = new FontFamily(prefs.FontFamily),
+            FontFamily = BundledFonts.Resolve(prefs.FontFamily),
             FontSize = prefs.FontSize,
             Background = Brushes.White,
             Foreground = Brushes.Black,
@@ -767,6 +767,9 @@ public static class DocumentExport
                 return null;
 
             var styleIndex = (isBold ? 1 : 0) + (isItalic ? 2 : 0);
+
+            if (BundledFonts.FileForFamily(familyName) is { } bundled && File.Exists(bundled))
+                return bundled;
 
             if (KnownFamilies.TryGetValue(familyName.Trim(), out var files))
             {

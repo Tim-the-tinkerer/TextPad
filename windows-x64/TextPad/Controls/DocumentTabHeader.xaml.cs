@@ -19,7 +19,11 @@ public partial class DocumentTabHeader : UserControl
     public string Title
     {
         get => TitleText.Text;
-        set => TitleText.Text = value;
+        set
+        {
+            TitleText.Text = value;
+            TitleText.ToolTip = value;
+        }
     }
 
     public void ApplyAppearance(bool selected, Color text, Color selectedText, Color accent, bool isDark)

@@ -27,6 +27,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var fileChangeMonitor = FileChangeMonitor()
     private var autoSaveManager: AutoSaveManager!
     private var isPromptingForExternalChange = false
+    private var hasLoadedDocumentIntoView = false
+    private var isApplyingPresentation = false
 
     init(document: EditorDocument) {
         self.document = document
@@ -153,7 +155,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
         let editorBottom = 22 + topInset
         let editorHeight = h - editorBottom
-        let showGutter = EditorPreferences.shared.showLineNumbers
+        let showGutter = EditorPreferences.shared.showLineNumbers &&
+            (textView.textStorage?.length ?? 0) <= LargeFileSupport.largeDocumentThreshold
 
         if showGutter, let gutter = lineNumberGutter {
             gutter.frame = NSRect(x: 0, y: editorBottom, width: LineNumberGutterView.width, height: editorHeight)
@@ -164,7 +167,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             scrollView.frame = NSRect(x: 0, y: editorBottom, width: w, height: editorHeight)
         }
 
-        if EditorPreferences.shared.wordWrap, let container = textView.textContainer {
+        if textView.textContainer?.widthTracksTextView == true, let container = textView.textContainer {
             let width = scrollView.contentSize.width
             if width > 0 {
                 container.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
@@ -172,8 +175,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    func reloadFromDocument() {
+    func reloadFromDocument(force: Bool = false) {
         _ = view
+        if hasLoadedDocumentIntoView && !force { return }
+        hasLoadedDocumentIntoView = true
 
         let theme = EditorPreferences.shared.effectiveTheme
         RichTextFormatting.configure(textView, richText: document.isRichText)
@@ -232,8 +237,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func applyPreferences(wordWrap override: Bool? = nil) {
+        isApplyingPresentation = true
+        defer { isApplyingPresentation = false }
+
         let prefs = EditorPreferences.shared
         let theme = prefs.effectiveTheme
+        let isLargeDocument = (textView.textStorage?.length ?? 0) > LargeFileSupport.largeDocumentThreshold
         inWindowFindBar.applyTheme(theme)
 
         RichTextFormatting.configure(textView, richText: document.isRichText)
@@ -256,9 +265,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 .foregroundColor: theme.text
             ]
             PlainTextEditing.applyTabWidth(to: textView, font: prefs.font, tabWidth: prefs.tabWidth)
-            PlainTextEditing.configureInvisibles(on: textView, show: prefs.showInvisibles)
+            PlainTextEditing.configureInvisibles(on: textView, show: prefs.showInvisibles && !isLargeDocument)
 
-            if let storage = textView.textStorage, storage.length > 0 {
+            if let storage = textView.textStorage, storage.length > 0, !isLargeDocument {
                 let range = NSRange(location: 0, length: storage.length)
                 storage.addAttributes([
                     .font: prefs.font,
@@ -270,7 +279,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let wordWrap = override ?? prefs.wordWrap
         LargeFileSupport.configureScrollable(textView, scrollView: scrollView, wordWrap: wordWrap)
 
-        if prefs.showLineNumbers {
+        if prefs.showLineNumbers && !isLargeDocument {
             if lineNumberGutter == nil {
                 let gutter = LineNumberGutterView(textView: textView, scrollView: scrollView)
                 lineNumberGutter = gutter
@@ -298,7 +307,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             PlainTextEditing.configureInvisibles(on: textView, show: false)
         } else {
             highlighter?.configure(language: document.language, theme: theme)
-            lineHighlightLayoutManager?.isHighlightEnabled = prefs.showCurrentLineHighlight
+            lineHighlightLayoutManager?.isHighlightEnabled = prefs.showCurrentLineHighlight && !isLargeDocument
             lineHighlightLayoutManager?.highlightColor = theme.currentLineHighlight
         }
         refreshCurrentLineHighlight()
@@ -310,17 +319,21 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func updateStatusBar() {
-        let text = textView.string as NSString
-        let location = min(textView.selectedRange().location, text.length)
-        let line = Self.lineNumber(at: location, in: text)
-        let lineStart = text.lineRange(for: NSRange(location: location, length: 0)).location
-        let col = location - lineStart + 1
-
-        lineColLabel.stringValue = "Ln \(line), Col \(col)"
+        let length = textView.textStorage?.length ?? 0
+        let location = min(textView.selectedRange().location, length)
+        if length > LargeFileSupport.largeDocumentThreshold {
+            lineColLabel.stringValue = "Offset \(location)"
+        } else {
+            let text = (textView.textStorage?.string ?? "") as NSString
+            let line = Self.lineNumber(at: location, in: text)
+            let lineStart = text.lineRange(for: NSRange(location: location, length: 0)).location
+            let col = location - lineStart + 1
+            lineColLabel.stringValue = "Ln \(line), Col \(col)"
+        }
         languageLabel.stringValue = document.isRichText ? "Rich Text" : document.language.displayName
         encodingLabel.stringValue = document.isRichText ? "RTF" : TextEncoding.named(document.encoding)
         lineEndingLabel.stringValue = document.isRichText ? "" : document.lineEnding.displayName
-        charCountLabel.stringValue = "\(text.length) characters"
+        charCountLabel.stringValue = "\(length) characters"
     }
 
     func documentDidSave() {
@@ -334,13 +347,20 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let editedRange = (notification.userInfo?["NSEditedRange"] as? NSValue)?.rangeValue ?? NSRange(location: 0, length: 0)
         let delta = (notification.userInfo?["NSDeltaLength"] as? NSNumber)?.intValue ?? 0
 
+        if isApplyingPresentation {
+            updateStatusBar()
+            return
+        }
+
         if !document.isDirty {
             document.isDirty = true
             delegate?.editorDidChange(self)
         }
 
         if !document.isRichText {
-            document.updateLineEndingIfNeeded(editedRange: editedRange, delta: delta, in: textView.string)
+            if (textView.textStorage?.length ?? 0) <= LargeFileSupport.largeDocumentThreshold {
+                document.updateLineEndingIfNeeded(editedRange: editedRange, delta: delta, in: textView.string)
+            }
             highlighter?.textDidChange(editedRange: editedRange, delta: delta)
         }
 
@@ -436,7 +456,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if response == .alertFirstButtonReturn {
             do {
                 try document.reloadFromDisk()
-                reloadFromDocument()
+                reloadFromDocument(force: true)
                 document.noteSavedToDisk()
                 fileChangeMonitor.suppressBriefly()
                 delegate?.editorDidChange(self)
@@ -541,7 +561,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             document.lineEndingPolicy = EditorPreferences.shared.lineEndingOnSave
             document.language = SyntaxLanguage.detect(from: document.fileURL)
         }
-        reloadFromDocument()
+        reloadFromDocument(force: true)
         delegate?.editorDidChange(self)
     }
 }

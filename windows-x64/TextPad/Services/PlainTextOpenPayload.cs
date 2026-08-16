@@ -25,7 +25,10 @@ public sealed class PlainTextOpenPayload
         var forceWordWrap = LargeFileSupport.HasExtremelyLongLines(text);
         document.ForceWordWrap = forceWordWrap;
         var logicalLineCount = LargeFileSupport.CountLogicalLines(text);
-        var useSimpleEditor = forceWordWrap && text.Length >= SimpleEditorThreshold;
+        // AvalonEdit virtualizes line rendering and remains the canonical editor.
+        // Switching large one-line documents to WPF TextBox duplicated the editor
+        // stack and made behavior and performance less predictable.
+        var useSimpleEditor = false;
 
         if (useSimpleEditor)
         {
@@ -55,7 +58,7 @@ public sealed class PlainTextOpenPayload
             Document = document,
             TextDocument = textDocument,
             UseSimpleEditor = false,
-            WordWrap = forceWordWrap || LargeFileSupport.ComputeWordWrap(text),
+            WordWrap = LargeFileSupport.ComputeWordWrap(text),
             ForceWordWrap = forceWordWrap,
             CharacterCount = text.Length,
             LogicalLineCount = logicalLineCount

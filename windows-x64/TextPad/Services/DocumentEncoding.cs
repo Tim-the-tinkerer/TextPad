@@ -12,20 +12,21 @@ public static class DocumentEncoding
     {
         return
         [
-            (new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), "UTF-8"),
-            (new UTF8Encoding(encoderShouldEmitUTF8Identifier: true), "UTF-8 with BOM"),
-            (Encoding.Unicode, "UTF-16 LE"),
-            (Encoding.BigEndianUnicode, "UTF-16 BE"),
-            (Encoding.ASCII, "ASCII"),
-            (Encoding.Latin1, "ISO Latin-1"),
-            (Encoding.GetEncoding(1252), "Windows Latin-1")
+            (new UTF8Encoding(false, true), "UTF-8"),
+            (new UTF8Encoding(true, true), "UTF-8 with BOM"),
+            (new UnicodeEncoding(false, true, true), "UTF-16 LE"),
+            (new UnicodeEncoding(true, true, true), "UTF-16 BE"),
+            (Encoding.GetEncoding(20127, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), "ASCII"),
+            (Encoding.GetEncoding(28591, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), "ISO Latin-1"),
+            (Encoding.GetEncoding(1252, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), "Windows Latin-1"),
+            (Encoding.GetEncoding(10000, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), "Mac Roman")
         ];
     }
 
     public static Encoding EncodingFromName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
-            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            return new UTF8Encoding(false, true);
 
         foreach (var item in Supported)
         {
@@ -33,7 +34,7 @@ public static class DocumentEncoding
                 return item.encoding;
         }
 
-        return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        return new UTF8Encoding(false, true);
     }
 
     public static string NameFor(Encoding encoding)
@@ -49,39 +50,81 @@ public static class DocumentEncoding
     public static Encoding Detect(byte[] bytes)
     {
         if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+            return new UTF8Encoding(true, true);
 
         if (bytes.Length >= 2)
         {
             if (bytes[0] == 0xFF && bytes[1] == 0xFE)
-                return Encoding.Unicode;
+                return new UnicodeEncoding(false, true, true);
             if (bytes[0] == 0xFE && bytes[1] == 0xFF)
-                return Encoding.BigEndianUnicode;
+                return new UnicodeEncoding(true, true, true);
         }
 
+        if (TryDetectBomlessUtf16(bytes, out var utf16))
+            return utf16;
+
         if (IsValidUtf8(bytes))
-            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            return new UTF8Encoding(false, true);
 
-        return Encoding.GetEncoding(1252);
+        return Encoding.GetEncoding(1252, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
     }
-
-    private const int Utf8ValidationSampleSize = 64 * 1024;
 
     private static bool IsValidUtf8(byte[] bytes)
     {
         if (bytes.Length == 0)
             return true;
 
-        var sampleLength = Math.Min(bytes.Length, Utf8ValidationSampleSize);
         try
         {
-            var decoder = Encoding.UTF8.GetDecoder();
-            decoder.Fallback = DecoderFallback.ExceptionFallback;
-            var chars = new char[Encoding.UTF8.GetMaxCharCount(sampleLength)];
-            decoder.GetChars(bytes, 0, sampleLength, chars, 0);
+            _ = new UTF8Encoding(false, true).GetCharCount(bytes);
             return true;
         }
         catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryDetectBomlessUtf16(byte[] bytes, out Encoding encoding)
+    {
+        encoding = null!;
+        if (bytes.Length < 4 || bytes.Length % 2 != 0)
+            return false;
+
+        var pairs = Math.Min(bytes.Length / 2, 32 * 1024);
+        var zeroEven = 0;
+        var zeroOdd = 0;
+        for (var i = 0; i < pairs; i++)
+        {
+            var even = bytes[i * 2];
+            var odd = bytes[i * 2 + 1];
+            if (even == 0 && odd != 0) zeroEven++;
+            if (odd == 0 && even != 0) zeroOdd++;
+        }
+
+        // Require a strong NUL-position signal. Arbitrary binary data should
+        // continue to the legacy-encoding fallback rather than becoming UTF-16.
+        if (zeroOdd > Math.Max(2, zeroEven * 3) && zeroOdd > pairs / 8)
+        {
+            encoding = new UnicodeEncoding(false, false, true);
+            return CanDecode(bytes, encoding);
+        }
+        if (zeroEven > Math.Max(2, zeroOdd * 3) && zeroEven > pairs / 8)
+        {
+            encoding = new UnicodeEncoding(true, false, true);
+            return CanDecode(bytes, encoding);
+        }
+        return false;
+    }
+
+    private static bool CanDecode(byte[] bytes, Encoding encoding)
+    {
+        try
+        {
+            _ = encoding.GetCharCount(bytes);
+            return true;
+        }
+        catch (DecoderFallbackException)
         {
             return false;
         }

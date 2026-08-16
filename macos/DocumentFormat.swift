@@ -14,7 +14,7 @@ enum DocumentFormat: String, CaseIterable {
     static func detect(from url: URL?) -> DocumentFormat {
         guard let ext = url?.pathExtension.lowercased() else { return .plainText }
         switch ext {
-        case "rtf", "rtfd": return .richText
+        case "rtf": return .richText
         default: return .plainText
         }
     }

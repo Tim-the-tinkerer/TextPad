@@ -2,7 +2,7 @@
 
 A lightweight text editor for **macOS** and **Windows**, inspired by BBEdit and CotEditor. Both platforms share the same feature set: plain-text and rich-text editing, syntax highlighting, multi-tab workflows, large-file handling, and auto-save recovery.
 
-**Current version: 1.5.3**
+**Current version: 1.5.5**
 
 | Platform | Source | Technology |
 |----------|--------|------------|
@@ -19,6 +19,7 @@ A lightweight text editor for **macOS** and **Windows**, inspired by BBEdit and 
 - Find, replace, and go-to-line
 - Line numbers, word wrap, invisible characters, current-line highlight
 - Themes: Light, Dark, Solarized, Sepia, and System
+- Bundled Interlac and Interlac Unicode fonts
 - Character encoding options (UTF-8, UTF-16, Latin-1, and others)
 - Line-ending detection and conversion (LF / CRLF / CR)
 - Auto-save recovery snapshots
@@ -88,8 +89,8 @@ Produces in `macos/dist/`:
 
 | File | Description |
 |------|-------------|
-| `TextPad-1.5.3-mac-arm64.dmg` | Drag-to-Applications disk image |
-| `TextPad-1.5.3-mac-arm64.pkg` | Guided installer (copies to `/Applications`) |
+| `TextPad-1.5.5-mac-arm64.dmg` | Drag-to-Applications disk image |
+| `TextPad-1.5.5-mac-arm64.pkg` | Guided installer (copies to `/Applications`) |
 
 On Intel Macs the architecture label is `x64` instead of `arm64`.
 
@@ -137,7 +138,7 @@ cd windows-x64
 .\build_installer.ps1
 ```
 
-Produces: `windows-x64\dist\TextPad-1.5.3-win-x64-Setup.exe`
+Produces: `windows-x64\dist\TextPad-1.5.5-win-x64-Setup.exe`
 
 Pass `-SkipSign` to skip code signing when no certificate is configured.
 

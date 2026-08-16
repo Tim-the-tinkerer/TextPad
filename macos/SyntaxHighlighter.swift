@@ -213,13 +213,14 @@ final class SyntaxHighlighter {
         guard language != .plain, contentGeneration == self.contentGeneration else { return }
         if let requestID, requestID != highlightRequestID { return }
 
-        let text = storage.string
-        let nsText = text as NSString
+        let completeText = storage.string
+        let nsText = completeText as NSString
         let fullLength = nsText.length
         guard fullLength > 0 else { return }
 
         let clamped = clampRange(targetRange, to: fullLength)
         guard clamped.length > 0 else { return }
+        let text = nsText.substring(with: clamped)
 
         let patterns = patternsForLanguage(language)
         let baseFont = EditorPreferences.shared.font
@@ -232,12 +233,12 @@ final class SyntaxHighlighter {
 
             let codeMatches = self.collectMatches(
                 in: text,
-                fullRange: NSRange(location: 0, length: fullLength),
+                fullRange: NSRange(location: 0, length: (text as NSString).length),
                 patterns: patterns.code
             )
             let literalMatches = self.collectMatches(
                 in: text,
-                fullRange: NSRange(location: 0, length: fullLength),
+                fullRange: NSRange(location: 0, length: (text as NSString).length),
                 patterns: patterns.literals
             )
 
@@ -253,11 +254,13 @@ final class SyntaxHighlighter {
                     .foregroundColor: baseColor
                 ], range: clamped)
 
-                for (range, color) in codeMatches where self.rangesIntersect(range, clamped) {
-                    self.storage.addAttribute(.foregroundColor, value: color, range: range)
+                for (range, color) in codeMatches {
+                    let absolute = NSRange(location: clamped.location + range.location, length: range.length)
+                    self.storage.addAttribute(.foregroundColor, value: color, range: absolute)
                 }
-                for (range, color) in literalMatches where self.rangesIntersect(range, clamped) {
-                    self.storage.addAttribute(.foregroundColor, value: color, range: range)
+                for (range, color) in literalMatches {
+                    let absolute = NSRange(location: clamped.location + range.location, length: range.length)
+                    self.storage.addAttribute(.foregroundColor, value: color, range: absolute)
                 }
                 self.storage.endEditing()
                 self.isApplyingHighlight = false
@@ -286,7 +289,6 @@ final class SyntaxHighlighter {
               let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else { return nil }
 
-        layoutManager.ensureLayout(for: textContainer)
         let visibleRect = textView.visibleRect
         let glyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textContainer)
         let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)

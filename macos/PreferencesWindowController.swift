@@ -67,7 +67,8 @@ final class PreferencesWindowController: NSWindowController {
         guard let content = window?.contentView else { return }
         content.wantsLayer = true
 
-        let fonts = ["Menlo", "SF Mono", "Monaco", "Courier New", "Andale Mono", "Source Code Pro"]
+        var fonts = ["Menlo", "SF Mono", "Monaco", "Courier New", "Andale Mono", "Source Code Pro"]
+        fonts.append(contentsOf: BundledFonts.familyNames)
         fontPopUp.addItems(withTitles: fonts)
 
         themePopUp.addItems(withTitles: EditorTheme.allCases.map(\.displayName))
@@ -294,6 +295,9 @@ final class PreferencesWindowController: NSWindowController {
 
     private func loadValues() {
         let prefs = EditorPreferences.shared
+        if fontPopUp.item(withTitle: prefs.fontName) == nil {
+            fontPopUp.addItem(withTitle: prefs.fontName)
+        }
         fontPopUp.selectItem(withTitle: prefs.fontName)
         fontSizeField.stringValue = "\(Int(prefs.fontSize))"
         tabWidthField.stringValue = "\(prefs.tabWidth)"

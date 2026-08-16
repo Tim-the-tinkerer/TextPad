@@ -1708,7 +1708,7 @@ public partial class MainWindow : Window
             return informational.Split('+')[0];
 
         var version = asm.GetName().Version;
-        return version is null ? "1.5.3" : $"{version.Major}.{version.Minor}.{version.Build}";
+        return version is null ? "1.5.5" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     private ContextMenu CreateEditorContextMenu()

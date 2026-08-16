@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using TextPad.Models;
+using TextPad.Services;
 
 namespace TextPad.Dialogs;
 
@@ -19,7 +20,7 @@ public partial class PreferencesDialog : Window
         ThemeBox.ItemsSource = Enum.GetValues<EditorThemeKind>();
         ThemeBox.SelectedItem = prefs.Theme;
 
-        FontBox.ItemsSource = new[] { "Consolas", "Cascadia Mono", "Courier New", "Lucida Console" };
+        FontBox.ItemsSource = BundledFonts.PreferenceFontNames;
         FontBox.SelectedItem = prefs.FontFamily;
 
         FontSizeBox.ItemsSource = Enumerable.Range(8, 25).Select(i => (object)i).ToList();

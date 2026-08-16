@@ -80,9 +80,11 @@ swiftc \
   GoToLineController.swift \
   DocumentWindowController.swift \
   PreferencesWindowController.swift \
+  BundledFonts.swift \
   -framework AppKit \
   -framework Foundation \
-  -framework UniformTypeIdentifiers
+  -framework UniformTypeIdentifiers \
+  -framework CoreText
 
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -99,6 +101,12 @@ fi
 if [ -f Help.md ]; then
   cp Help.md "$APP_DIR/Contents/Resources/Help.md"
   chmod 644 "$APP_DIR/Contents/Resources/Help.md"
+fi
+
+if [ -d Fonts ]; then
+  mkdir -p "$APP_DIR/Contents/Resources/Fonts"
+  find Fonts -maxdepth 1 \( -name '*.ttf' -o -name '*.otf' \) -exec cp {} "$APP_DIR/Contents/Resources/Fonts/" \;
+  chmod 644 "$APP_DIR/Contents/Resources/Fonts/"* 2>/dev/null || true
 fi
 
 chmod a+rX "$APP_DIR/Contents/Resources"

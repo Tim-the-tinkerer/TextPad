@@ -272,7 +272,8 @@ final class EditorPreferences {
     }
 
     var font: NSFont {
-        NSFont(name: fontName, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        BundledFonts.font(named: fontName, size: fontSize)
+            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
     }
 
     static let didChangeNotification = Notification.Name("EditorPreferencesDidChange")

@@ -16,6 +16,8 @@ if !singleInstanceManager.tryBecomePrimary() {
     }
 }
 
+BundledFonts.register()
+
 let app = NSApplication.shared
 let delegate = AppDelegate(singleInstanceManager: singleInstanceManager)
 app.delegate = delegate

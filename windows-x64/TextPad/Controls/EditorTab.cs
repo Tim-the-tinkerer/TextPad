@@ -514,9 +514,17 @@ public sealed class EditorTab : IDisposable
         var prefs = EditorPreferences.Instance;
         if (IsRichText)
         {
-            RichEditor!.FontSize = prefs.FontSize;
-            RichEditor.FontFamily = new FontFamily("Segoe UI");
-            ApplyTheme();
+            // Keep the RTF font table. Assigning FontFamily/FontSize here
+            // replaced named faces such as Interlac Unicode with Segoe UI.
+            _suppressDirty = true;
+            try
+            {
+                ApplyTheme();
+            }
+            finally
+            {
+                _suppressDirty = false;
+            }
             return;
         }
 
@@ -533,7 +541,7 @@ public sealed class EditorTab : IDisposable
             LargeFileSupport.CountLogicalLines(PlainEditor.Document.Text));
         PlainEditor.WordWrap = Document.ForceWordWrap
             || (PlainEditor.Document.TextLength <= LargeFileSupport.LargeDocumentCharacterThreshold && prefs.WordWrap);
-        PlainEditor.FontFamily = new FontFamily(prefs.FontFamily);
+        PlainEditor.FontFamily = BundledFonts.Resolve(prefs.FontFamily);
         PlainEditor.FontSize = prefs.FontSize;
         PlainEditor.Options.IndentationSize = prefs.TabWidth;
         ApplyTheme();
@@ -577,7 +585,7 @@ public sealed class EditorTab : IDisposable
     {
         ShowLineNumbers = EditorPreferences.Instance.ShowLineNumbers,
         WordWrap = EditorPreferences.Instance.WordWrap,
-        FontFamily = new FontFamily(EditorPreferences.Instance.FontFamily),
+        FontFamily = BundledFonts.Resolve(EditorPreferences.Instance.FontFamily),
         FontSize = EditorPreferences.Instance.FontSize,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,

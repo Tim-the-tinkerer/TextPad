@@ -1,5 +1,29 @@
 # TextPad (Windows) Changelog
 
+## 1.5.5 — 2026-08-16
+
+### Added
+- Bundled **Interlac** and **Interlac Unicode** fonts. They appear in Preferences and are registered so RTF documents that name them render without a system install.
+
+### Changed
+- Long tab titles already truncate; the tab strip now scrolls horizontally when documents overflow the window. Hovering a tab shows the full file name.
+
+### Fixed
+- RTF documents keep the fonts named in their font table. Preferences no longer replace those faces with Segoe UI, and named families that WPF dropped (including `\fnil` entries such as Interlac Unicode) are restored after open.
+- Near-white Cocoa RTF text (for example `#F0F2EB` on a white page) is lifted to readable black ink instead of disappearing into the paper. Saturated colors and already-readable grays are left alone.
+
+## 1.5.4 — 2026-08-16
+
+### Fixed
+- Large and single-line documents remain in AvalonEdit instead of switching to a second WPF TextBox editor.
+- Extremely long lines no longer force word wrapping.
+- UTF-8 validation covers the complete file and cannot fail merely because a sample ended inside a multibyte character.
+- BOM-less UTF-16 LE and BE files are detected using byte-position evidence.
+- Text encoders and decoders use strict fallbacks; unsupported characters now produce a clear error instead of silently becoming question marks.
+- Mac Roman is available alongside the existing legacy encodings.
+- Rich text is shown on a neutral paper surface; application themes no longer rewrite document colors during ordinary viewing.
+- The explicit file-size ceiling is raised from 100 MB to 256 MB.
+
 ## 1.5.3 — 2026-07-10
 
 Version aligned with macOS 1.5.3.

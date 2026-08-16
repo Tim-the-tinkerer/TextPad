@@ -6,6 +6,7 @@ struct AutoSaveEntry: Codable {
     let displayName: String
     let content: String
     let encodingName: String
+    let writesByteOrderMark: Bool?
     let lineEnding: String
     let savedAt: Date
     let format: String
@@ -13,6 +14,7 @@ struct AutoSaveEntry: Codable {
 }
 
 final class AutoSaveManager {
+    static let maxAutoSaveCharacters = 500_000
     private weak var editor: EditorViewController?
     private var timer: Timer?
     private let fileManager = FileManager.default
@@ -41,6 +43,7 @@ final class AutoSaveManager {
         guard let editor else { return }
         let document = editor.document
         guard document.isDirty || document.fileURL == nil else { return }
+        guard editor.activeTextView.string.utf16.count <= Self.maxAutoSaveCharacters else { return }
         editor.syncDocument()
 
         let rtfBase64: String?
@@ -56,6 +59,7 @@ final class AutoSaveManager {
             displayName: document.displayName.replacingOccurrences(of: " •", with: ""),
             content: document.content,
             encodingName: TextEncoding.named(document.encoding),
+            writesByteOrderMark: document.writesByteOrderMark,
             lineEnding: document.lineEnding.rawValue,
             savedAt: Date(),
             format: document.format.rawValue,

@@ -1,5 +1,7 @@
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -18,8 +20,167 @@ public static class RichTextHelper
         // Cocoa/email RTF often uses nested tables that WPF lays out as broken
         // side-by-side columns (headers left, body right). Flatten to vertical flow.
         FlattenComplexTables(editor.Document);
+        RestoreNamedFontsFromRtf(editor.Document, data);
         if (applyTheme)
             ApplyTheme(editor, EditorPreferences.Instance.EffectiveTheme);
+    }
+
+    private static readonly HashSet<string> GenericFontFamilies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Times New Roman",
+        "Segoe UI",
+        "Microsoft Sans Serif",
+        "serif",
+        "sans-serif",
+        "Global User Interface",
+        "Global Monospace",
+        "Global Sans Serif",
+        "Global Serif"
+    };
+
+    private static readonly Regex RtfDefaultFontRegex = new(
+        @"\\deff(\d+)",
+        RegexOptions.CultureInvariant);
+
+    private static readonly Regex RtfFontEntryRegex = new(
+        @"\\f(\d+)(?:\\[a-zA-Z]+[0-9]*)*\s+([^;{}]+);",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// WPF's RTF reader often falls back to Times New Roman for named faces
+    /// in the font table (especially <c>\fnil</c> entries). Re-apply those
+    /// names when the document asked for a real family such as Interlac Unicode.
+    /// </summary>
+    private static void RestoreNamedFontsFromRtf(FlowDocument document, byte[] rtf)
+    {
+        if (!TryReadRtfFontTable(rtf, out var fonts, out var defaultId))
+            return;
+
+        if (!fonts.TryGetValue(defaultId, out var defaultName) || IsGenericFont(defaultName))
+            defaultName = fonts.Values.FirstOrDefault(name => !IsGenericFont(name)) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(defaultName))
+            return;
+
+        var tableNames = new HashSet<string>(fonts.Values, StringComparer.OrdinalIgnoreCase);
+        if (IsGenericFont(document.FontFamily?.Source) && !TableRequestsFont(tableNames, document.FontFamily?.Source))
+            document.FontFamily = BundledFonts.Resolve(defaultName);
+
+        RestoreNamedFonts(document.Blocks, tableNames, defaultName);
+    }
+
+    private static bool TryReadRtfFontTable(
+        byte[] rtf,
+        out Dictionary<int, string> fonts,
+        out int defaultId)
+    {
+        fonts = new Dictionary<int, string>();
+        defaultId = 0;
+        var text = Encoding.Latin1.GetString(rtf);
+        var tableStart = text.IndexOf("{\\fonttbl", StringComparison.Ordinal);
+        if (tableStart < 0)
+            return false;
+
+        var tableEnd = text.IndexOf("}}", tableStart, StringComparison.Ordinal);
+        var table = tableEnd >= 0 ? text[tableStart..(tableEnd + 2)] : text[tableStart..];
+
+        var defaultMatch = RtfDefaultFontRegex.Match(text[..Math.Min(text.Length, tableStart + 32)]);
+        if (defaultMatch.Success)
+            defaultId = int.Parse(defaultMatch.Groups[1].Value);
+
+        foreach (Match match in RtfFontEntryRegex.Matches(table))
+        {
+            var name = match.Groups[2].Value.Trim();
+            if (name.StartsWith("\\", StringComparison.Ordinal))
+                continue;
+            fonts[int.Parse(match.Groups[1].Value)] = name;
+        }
+
+        return fonts.Count > 0;
+    }
+
+    private static void RestoreNamedFonts(
+        IEnumerable<Block> blocks,
+        HashSet<string> tableNames,
+        string fallback)
+    {
+        foreach (var block in blocks)
+        {
+            switch (block)
+            {
+                case Paragraph paragraph:
+                    RestoreElementFont(paragraph, tableNames, fallback);
+                    RestoreNamedFonts(paragraph.Inlines, tableNames, fallback);
+                    break;
+                case Section section:
+                    RestoreNamedFonts(section.Blocks, tableNames, fallback);
+                    break;
+                case List list:
+                    foreach (ListItem item in list.ListItems)
+                        RestoreNamedFonts(item.Blocks, tableNames, fallback);
+                    break;
+                case Table table:
+                    foreach (var rowGroup in table.RowGroups)
+                    foreach (var row in rowGroup.Rows)
+                    foreach (var cell in row.Cells)
+                        RestoreNamedFonts(cell.Blocks, tableNames, fallback);
+                    break;
+            }
+        }
+    }
+
+    private static void RestoreNamedFonts(
+        InlineCollection inlines,
+        HashSet<string> tableNames,
+        string fallback)
+    {
+        foreach (var inline in inlines)
+        {
+            RestoreElementFont(inline, tableNames, fallback);
+            if (inline is Span span)
+                RestoreNamedFonts(span.Inlines, tableNames, fallback);
+        }
+    }
+
+    private static void RestoreElementFont(
+        DependencyObject element,
+        HashSet<string> tableNames,
+        string fallback)
+    {
+        var current = element switch
+        {
+            TextElement textElement => textElement.FontFamily?.Source,
+            FlowDocument document => document.FontFamily?.Source,
+            _ => null
+        };
+        if (!IsGenericFont(current) || TableRequestsFont(tableNames, current))
+            return;
+
+        var family = BundledFonts.Resolve(fallback);
+        switch (element)
+        {
+            case TextElement textElement:
+                textElement.FontFamily = family;
+                break;
+            case FlowDocument document:
+                document.FontFamily = family;
+                break;
+        }
+    }
+
+    private static bool IsGenericFont(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return true;
+        return GenericFontFamilies.Contains(PrimaryFontName(name));
+    }
+
+    private static bool TableRequestsFont(HashSet<string> tableNames, string? name) =>
+        !string.IsNullOrWhiteSpace(name) && tableNames.Contains(PrimaryFontName(name));
+
+    private static string PrimaryFontName(string name)
+    {
+        var comma = name.IndexOf(',');
+        return (comma < 0 ? name : name[..comma]).Trim();
     }
 
     /// <summary>
@@ -255,10 +416,11 @@ public static class RichTextHelper
 
     public static void ApplyTheme(RichTextBox editor, EditorTheme theme)
     {
-        editor.Background = new SolidColorBrush(theme.Background);
-        editor.Foreground = new SolidColorBrush(theme.Text);
-        editor.Document.Foreground = new SolidColorBrush(theme.Text);
-        editor.Document.Background = new SolidColorBrush(theme.Background);
+        // Present RTF on a conventional paper surface. Do not restyle the
+        // document for the application theme; only lift ink that cannot be
+        // read on that surface (e.g. Cocoa #F0F2EB on white).
+        editor.Background = Brushes.White;
+        editor.Foreground = Brushes.Black;
 
         var selectionBrush = new SolidColorBrush(theme.Selection);
         selectionBrush.Freeze();
@@ -268,7 +430,67 @@ public static class RichTextHelper
         editor.SelectionTextBrush = selectionForeground;
         editor.SelectionOpacity = 1.0;
 
-        RemapDocumentColors(editor.Document, theme);
+        EnsureReadableForegrounds(editor.Document);
+    }
+
+    private static void EnsureReadableForegrounds(FlowDocument document) =>
+        EnsureReadableForegrounds(document.Blocks, Luminance(Colors.White));
+
+    private static void EnsureReadableForegrounds(IEnumerable<Block> blocks, double surfaceLuminance)
+    {
+        foreach (var block in blocks)
+        {
+            switch (block)
+            {
+                case Paragraph paragraph:
+                    LiftIfUnreadable(paragraph, surfaceLuminance);
+                    EnsureReadableInlines(paragraph.Inlines, surfaceLuminance);
+                    break;
+                case Section section:
+                    EnsureReadableForegrounds(section.Blocks, surfaceLuminance);
+                    break;
+                case List list:
+                    foreach (ListItem item in list.ListItems)
+                        EnsureReadableForegrounds(item.Blocks, surfaceLuminance);
+                    break;
+                case Table table:
+                    foreach (var rowGroup in table.RowGroups)
+                    foreach (var row in rowGroup.Rows)
+                    foreach (var cell in row.Cells)
+                    {
+                        var cellColor = GetBrushColor(cell.Background, Colors.Transparent);
+                        var luminance = cellColor.A > 51 ? Luminance(cellColor) : surfaceLuminance;
+                        EnsureReadableForegrounds(cell.Blocks, luminance);
+                    }
+                    break;
+            }
+        }
+    }
+
+    private static void EnsureReadableInlines(InlineCollection inlines, double surfaceLuminance)
+    {
+        foreach (var inline in inlines)
+        {
+            LiftIfUnreadable(inline, surfaceLuminance);
+            if (inline is Span span)
+                EnsureReadableInlines(span.Inlines, surfaceLuminance);
+        }
+    }
+
+    private static void LiftIfUnreadable(TextElement element, double surfaceLuminance)
+    {
+        if (element.ReadLocalValue(TextElement.ForegroundProperty) == DependencyProperty.UnsetValue)
+            return;
+
+        var foreground = GetBrushColor(element.Foreground, Colors.Transparent);
+        if (foreground.A <= 16)
+            return;
+        if (Saturation(foreground) > 0.18)
+            return;
+        if (ContrastRatio(Luminance(foreground), surfaceLuminance) >= 3.0)
+            return;
+
+        element.Foreground = Brushes.Black;
     }
 
     public static void ApplyExportTheme(RichTextBox editor)
@@ -752,15 +974,7 @@ public static class RichTextHelper
         if (!isNeutral)
             return false;
 
-        if (ContrastRatio(luminance, backgroundLuminance) < 3.0)
-            return true;
-
-        // Light-gray text on a light surface (classic email table styling).
-        if (backgroundLuminance > 0.6)
-            return luminance > 0.3;
-
-        // Dark-gray / near-black text on a dark theme surface.
-        return theme.IsDark && luminance < 0.55 && backgroundLuminance < 0.5;
+        return ContrastRatio(luminance, backgroundLuminance) < 3.0;
     }
 
     private static bool ShouldRemapHighlight(Color color, EditorTheme theme)

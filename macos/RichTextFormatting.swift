@@ -12,8 +12,11 @@ enum RichTextFormatting {
         textView.isAutomaticQuoteSubstitutionEnabled = richText
         textView.isAutomaticDashSubstitutionEnabled = richText
 
-        if richText {
-            textView.font = NSFont.systemFont(ofSize: EditorPreferences.shared.fontSize)
+        // Never assign textView.font on a rich-text view that already has
+        // content. NSTextView.font replaces every run — including named RTF
+        // fonts such as Interlac Unicode — even when the selection is empty.
+        if richText, (textView.textStorage?.length ?? 0) == 0 {
+            textView.typingAttributes = defaultTypingAttributes(theme: EditorPreferences.shared.effectiveTheme)
         }
     }
 
@@ -25,72 +28,81 @@ enum RichTextFormatting {
     }
 
     static func applyTheme(_ theme: EditorTheme, to textView: NSTextView) {
-        textView.backgroundColor = theme.background
+        // RTF is a page-oriented interchange format. Present it on a neutral
+        // paper surface so its own colors remain readable without rewriting them.
+        let paper = NSColor.white
+        let ink = NSColor.black
+        textView.backgroundColor = paper
         textView.drawsBackground = true
-        textView.insertionPointColor = theme.text
-        textView.textColor = theme.text
-        textView.typingAttributes = defaultTypingAttributes(theme: theme)
+        textView.insertionPointColor = ink
+        // Do not assign textView.font or textView.textColor. Both rewrite
+        // document runs and would discard the RTF font table and colors.
+        textView.typingAttributes = typingAttributesPreservingDocument(in: textView, ink: ink)
         textView.selectedTextAttributes = [
             .backgroundColor: theme.selection,
-            .foregroundColor: theme.text
+            .foregroundColor: ink
         ]
         textView.linkTextAttributes = [
             .foregroundColor: theme.uiAccent,
             .underlineStyle: NSUnderlineStyle.single.rawValue
         ]
 
-        guard let storage = textView.textStorage else { return }
-        let fullRange = NSRange(location: 0, length: storage.length)
-        guard fullRange.length > 0 else { return }
+        // Lift only ink that is unreadable on the paper/cell surface
+        // (e.g. Cocoa RTF that paints #F0F2EB on white). Do not restyle
+        // readable colors or apply an application theme to the document.
+        ensureReadableForegrounds(in: textView, paper: paper)
+    }
 
+    private static let minimumReadableContrast: CGFloat = 3.0
+
+    private static func ensureReadableForegrounds(in textView: NSTextView, paper: NSColor) {
+        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        let full = NSRange(location: 0, length: storage.length)
         storage.beginEditing()
-
-        var index = 0
-        while index < fullRange.length {
-            var effectiveRange = NSRange()
-            let existing = storage.attribute(.foregroundColor, at: index, effectiveRange: &effectiveRange) as? NSColor
-            let resolved = resolvedDocumentColor(existing, for: theme)
-            let components = colorComponents(resolved ?? theme.text)
-            let bgLuminance = effectiveBackgroundLuminance(
-                at: index,
-                in: storage,
-                editorBackground: theme.background
-            )
-
-            if shouldNormalizeForeground(
-                components: components,
-                backgroundLuminance: bgLuminance,
-                theme: theme
-            ) {
-                storage.addAttribute(
-                    .foregroundColor,
-                    value: preferredTextColor(forBackgroundLuminance: bgLuminance, theme: theme),
-                    range: effectiveRange
-                )
-            } else if let resolved {
-                storage.addAttribute(.foregroundColor, value: resolved, range: effectiveRange)
-            }
-
-            storage.removeAttribute(.strokeColor, range: effectiveRange)
-            storage.removeAttribute(.strokeWidth, range: effectiveRange)
-            index = NSMaxRange(effectiveRange)
-        }
-
-        storage.enumerateAttribute(.backgroundColor, in: fullRange) { value, range, _ in
-            guard let color = value as? NSColor else { return }
-            if shouldRemapHighlight(color, for: theme) {
-                storage.addAttribute(.backgroundColor, value: theme.selection, range: range)
-            } else if shouldRemapDocumentBackground(color, for: theme) {
-                storage.addAttribute(.backgroundColor, value: theme.uiControlBackground, range: range)
-            }
-        }
-
-        storage.enumerateAttribute(.link, in: fullRange) { value, range, _ in
-            guard value != nil else { return }
-            storage.addAttribute(.foregroundColor, value: theme.uiAccent, range: range)
-        }
-
+        liftUnreadableColor(in: storage, attribute: .foregroundColor, range: full, paper: paper)
+        liftUnreadableColor(in: storage, attribute: .underlineColor, range: full, paper: paper)
         storage.endEditing()
+    }
+
+    private static func liftUnreadableColor(
+        in storage: NSTextStorage,
+        attribute: NSAttributedString.Key,
+        range: NSRange,
+        paper: NSColor
+    ) {
+        storage.enumerateAttribute(attribute, in: range) { value, run, _ in
+            guard let color = value as? NSColor else { return }
+            let background = effectiveBackgroundLuminance(at: run.location, in: storage, editorBackground: paper)
+            let components = colorComponents(color)
+            guard components.alpha > 0.2 else { return }
+            guard components.saturation <= 0.18 else { return }
+            guard contrastRatio(foreground: components.luminance, background: background) < minimumReadableContrast else {
+                return
+            }
+            storage.addAttribute(attribute, value: preferredTextColor(forBackgroundLuminance: background, theme: .light), range: run)
+        }
+    }
+
+    private static func typingAttributesPreservingDocument(
+        in textView: NSTextView,
+        ink: NSColor
+    ) -> [NSAttributedString.Key: Any] {
+        guard let storage = textView.textStorage, storage.length > 0 else {
+            return [
+                .font: NSFont.systemFont(ofSize: EditorPreferences.shared.fontSize),
+                .foregroundColor: ink
+            ]
+        }
+
+        let location = min(max(textView.selectedRange().location, 0), storage.length - 1)
+        var attributes = storage.attributes(at: location, effectiveRange: nil)
+        if attributes[.font] == nil {
+            attributes[.font] = NSFont.systemFont(ofSize: EditorPreferences.shared.fontSize)
+        }
+        if attributes[.foregroundColor] == nil {
+            attributes[.foregroundColor] = ink
+        }
+        return attributes
     }
 
     private struct ColorComponents {
@@ -168,20 +180,7 @@ enum RichTextFormatting {
             return false
         }
 
-        let contrast = contrastRatio(foreground: components.luminance, background: backgroundLuminance)
-        if contrast < 3.0 {
-            return true
-        }
-
-        if backgroundLuminance > 0.6 {
-            return components.luminance > 0.3
-        }
-
-        if theme.isDark {
-            return components.luminance < 0.55 && backgroundLuminance < 0.5
-        }
-
-        return false
+        return contrastRatio(foreground: components.luminance, background: backgroundLuminance) < minimumReadableContrast
     }
 
     private static func preferredTextColor(forBackgroundLuminance backgroundLuminance: CGFloat, theme: EditorTheme) -> NSColor {

@@ -37,7 +37,7 @@ Only one TextPad instance runs at a time. Launching TextPad again (or opening fi
 ### Supported formats
 
 - **Plain text** — Any text file; encoding detected or chosen on open. If detection fails, TextPad falls back to ISO Latin-1 so unusual or binary files can still be opened.
-- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables. Text colors are adjusted for readable contrast in your chosen theme. Use Format → Make Plain Text to convert to plain text.
+- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables and the fonts named in the document. The editor theme does not replace those fonts. Ink that is too close to the paper color is darkened so the page stays readable. Use Format → Make Plain Text to convert to plain text.
 
 ### Character encodings
 
@@ -126,7 +126,7 @@ Open via **TextPad → Preferences** (**⌘,**).
 | Setting | Description |
 |---------|-------------|
 | Theme | Light, Dark, Solarized, Sepia, or follow macOS (System) |
-| Font | Editor font family (plain text) |
+| Font | Editor font family (plain text). Includes bundled Interlac and Interlac Unicode. |
 | Font size | 8–72 pt |
 | Tab width | Spaces per tab when converting tabs |
 | Line endings on save | Preserve, LF, or CRLF |

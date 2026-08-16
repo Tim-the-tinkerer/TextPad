@@ -152,6 +152,19 @@ enum LineEndingPolicy: String, CaseIterable {
 }
 
 enum DocumentEncodingSupport {
+    static func hasBOM(_ data: Data, for encoding: String.Encoding) -> Bool {
+        if encoding == .utf8 {
+            return data.count >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF
+        }
+        if encoding == .utf16LittleEndian {
+            return data.count >= 2 && data[0] == 0xFF && data[1] == 0xFE
+        }
+        if encoding == .utf16BigEndian {
+            return data.count >= 2 && data[0] == 0xFE && data[1] == 0xFF
+        }
+        return false
+    }
+
     static func detectEncoding(in data: Data) -> String.Encoding? {
         if data.isEmpty { return .utf8 }
 
@@ -165,12 +178,12 @@ enum DocumentEncodingSupport {
             return .utf16BigEndian
         }
 
-        if let text = String(data: data, encoding: .utf8), isReasonableUTF8(text, data: data) {
-            return .utf8
-        }
-
         if let utf16 = detectUTF16Endianness(in: data) {
             return utf16
+        }
+
+        if let text = String(data: data, encoding: .utf8), isReasonableUTF8(text, data: data) {
+            return .utf8
         }
 
         if data.allSatisfy({ $0 < 0x80 }) {
@@ -208,10 +221,10 @@ enum DocumentEncodingSupport {
         return String(data: payload, encoding: resolved)
     }
 
-    static func encode(_ text: String, encoding: String.Encoding, lineEndingPolicy: LineEndingPolicy, originalLineEnding: LineEnding) -> Data? {
+    static func encode(_ text: String, encoding: String.Encoding, lineEndingPolicy: LineEndingPolicy, originalLineEnding: LineEnding, includeBOM: Bool) -> Data? {
         let normalized = lineEndingPolicy.apply(to: text, original: originalLineEnding)
-        guard var payload = normalized.data(using: encoding) else { return nil }
-        if let bom = bom(for: encoding) {
+        guard var payload = normalized.data(using: encoding, allowLossyConversion: false) else { return nil }
+        if includeBOM, let bom = bom(for: encoding) {
             payload = bom + payload
         }
         return payload
@@ -246,7 +259,7 @@ enum DocumentEncodingSupport {
 
         var zeroEven = 0
         var zeroOdd = 0
-        let pairs = data.count / 2
+        let pairs = min(data.count / 2, 32 * 1024)
         for index in 0..<pairs {
             let even = data[index * 2]
             let odd = data[index * 2 + 1]
@@ -256,12 +269,14 @@ enum DocumentEncodingSupport {
 
         let candidates: [String.Encoding]
         if zeroEven > zeroOdd * 2 {
-            candidates = [.utf16LittleEndian, .utf16BigEndian]
-        } else if zeroOdd > zeroEven * 2 {
             candidates = [.utf16BigEndian, .utf16LittleEndian]
-        } else {
+        } else if zeroOdd > zeroEven * 2 {
             candidates = [.utf16LittleEndian, .utf16BigEndian]
+        } else {
+            return nil
         }
+
+        guard max(zeroEven, zeroOdd) > max(2, pairs / 8) else { return nil }
 
         for encoding in candidates {
             if let text = String(data: data, encoding: encoding), isReasonableUTF16(text) {

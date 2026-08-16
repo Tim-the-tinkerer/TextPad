@@ -18,7 +18,7 @@ public sealed class EditorDocument
     public Guid DocumentId { get; } = Guid.NewGuid();
     public string? FilePath { get; set; }
     public DocumentFormat Format { get; set; } = DocumentFormat.PlainText;
-    public Encoding Encoding { get; set; } = Encoding.UTF8;
+    public Encoding Encoding { get; set; } = new UTF8Encoding(false, true);
     public LineEndingKind LineEnding { get; set; } = LineEndingKind.Lf;
     public bool IsDirty { get; set; }
     public byte[]? RtfData { get; set; }
@@ -81,7 +81,7 @@ public sealed class EditorDocument
         }
     }
 
-    public const int MaxLoadBytes = 100 * 1024 * 1024;
+    public const int MaxLoadBytes = 256 * 1024 * 1024;
 
     public static EditorDocument LoadFromFile(string path, Encoding? explicitEncoding = null)
     {
@@ -105,9 +105,17 @@ public sealed class EditorDocument
         }
 
         var encoding = explicitEncoding ?? DocumentEncoding.Detect(bytes);
-        var text = encoding.GetString(bytes);
-        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF && encoding is UTF8Encoding)
-            text = encoding.GetString(bytes, 3, bytes.Length - 3);
+        var preamble = encoding.GetPreamble();
+        var offset = StartsWith(bytes, preamble) ? preamble.Length : 0;
+        string text;
+        try
+        {
+            text = encoding.GetString(bytes, offset, bytes.Length - offset);
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new InvalidDataException($"The file contains bytes that are invalid for {DocumentEncoding.NameFor(encoding)}.", ex);
+        }
 
         doc.Encoding = encoding;
         doc.LineEnding = DetectLineEndings(text);
@@ -163,9 +171,26 @@ public sealed class EditorDocument
     public byte[] BuildBytesForSave(string text)
     {
         var output = ApplyLineEndingPolicy(text);
-        var bytes = Encoding.GetBytes(output);
+        byte[] bytes;
+        try
+        {
+            bytes = Encoding.GetBytes(output);
+        }
+        catch (EncoderFallbackException ex)
+        {
+            throw new InvalidDataException($"The document contains characters that cannot be saved as {DocumentEncoding.NameFor(Encoding)}. Choose a Unicode encoding and try again.", ex);
+        }
         var preamble = Encoding.GetPreamble();
         return preamble.Length > 0 ? preamble.Concat(bytes).ToArray() : bytes;
+    }
+
+    private static bool StartsWith(byte[] bytes, byte[] prefix)
+    {
+        if (prefix.Length == 0 || bytes.Length < prefix.Length)
+            return false;
+        for (var i = 0; i < prefix.Length; i++)
+            if (bytes[i] != prefix[i]) return false;
+        return true;
     }
 
     public void SavePlainText(string text, string? targetPath = null)

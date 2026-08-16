@@ -1,5 +1,32 @@
 # TextPad (macOS) Changelog
 
+## 1.5.5 — 2026-08-16
+
+### Added
+- Bundled **Interlac** and **Interlac Unicode** fonts. They appear in Preferences and are registered so RTF documents that name them render without a system install.
+
+### Changed
+- Long tab titles truncate in the middle and show the full name on hover. Overflow tabs scroll with swipe, the mouse wheel, or ‹ › buttons. The + button stays pinned on the right, and the tab strip is no longer covered by a scrollbar.
+
+### Fixed
+- RTF documents keep the fonts named in their font table. Applying the editor theme no longer replaces faces such as Interlac Unicode with the system font.
+- Near-white Cocoa RTF text (for example `#F0F2EB` on a white page) is lifted to readable black ink instead of disappearing into the paper. Saturated colors and already-readable grays are left alone.
+
+## 1.5.4 — 2026-08-16
+
+### Fixed
+- Large documents no longer force AppKit to lay out the complete file before becoming usable.
+- Switching tabs no longer rebuilds an already-loaded text view.
+- Syntax highlighting now scans the requested range instead of rescanning the complete document for every chunk.
+- Line numbers, invisible characters, current-line highlighting, and line/column counting are automatically reduced for large documents.
+- File decoding runs off the main thread so the application remains responsive while opening large files.
+- BOM-less UTF-16 LE and BE detection no longer reverses byte order.
+- Existing UTF-8 and UTF-16 byte-order marks are preserved when saving.
+- Saving to ASCII or a legacy encoding now fails clearly instead of replacing unsupported characters.
+- Rich text is shown on a neutral paper surface; application themes no longer rewrite RTF colors and formatting that would later be saved into the document.
+- RTFD packages now produce a clear unsupported-format message instead of being misread as flat RTF data.
+- The explicit file-size ceiling is raised from 100 MB to 256 MB.
+
 ## 1.5.3 — 2026-07-10
 
 Version aligned with Windows 1.5.3.

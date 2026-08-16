@@ -5,6 +5,11 @@ enum LargeFileSupport {
     static let largeDocumentThreshold = 500_000
 
     static func maxLineLength(in text: String) -> Int {
+        // Avoid a second full Unicode traversal just to decide whether wrapping
+        // should be disabled for a document already known to be large.
+        if text.utf16.count > largeDocumentThreshold {
+            return longLineThreshold + 1
+        }
         var maxLength = 0
         var current = 0
         for character in text {
@@ -51,21 +56,14 @@ enum LargeFileSupport {
     }
 
     static func updateSizeToFitContent(textView: NSTextView, scrollView: NSScrollView) {
-        guard let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else { return }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let used = layoutManager.usedRect(for: textContainer)
-        let inset = textView.textContainerInset
-        var size = scrollView.contentSize
-        size.height = max(size.height, used.height + inset.height * 2)
-
-        if textView.isHorizontallyResizable {
-            size.width = max(size.width, used.width + inset.width * 2)
-        } else {
+        // NSTextView lays out text incrementally. Forcing ensureLayout here made
+        // opening a file proportional to the size of the entire document and
+        // defeated AppKit's viewport-driven layout.
+        var size = textView.frame.size
+        size.height = max(size.height, scrollView.contentSize.height)
+        if !textView.isHorizontallyResizable {
             size.width = scrollView.contentSize.width
         }
-
         textView.setFrameSize(size)
     }
 }

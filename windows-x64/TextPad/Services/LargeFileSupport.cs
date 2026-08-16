@@ -67,7 +67,7 @@ public static class LargeFileSupport
             return false;
 
         if (HasExtremelyLongLines(text))
-            return true;
+            return false;
 
         if (text.Length > LargeDocumentCharacterThreshold)
             return false;
@@ -77,10 +77,10 @@ public static class LargeFileSupport
 
     public static void ConfigureEditorForContent(TextEditor editor, string text)
     {
-        var forceWordWrap = HasExtremelyLongLines(text);
+        var forceWordWrap = false;
         ApplyEditorContentSettings(
             editor,
-            forceWordWrap || ComputeWordWrap(text),
+            ComputeWordWrap(text),
             text.Length,
             forceWordWrap,
             CountLogicalLines(text));
@@ -162,6 +162,6 @@ public static class LargeFileSupport
         editor.Options.EnableEmailHyperlinks = false;
         editor.ShowLineNumbers = ShouldShowLineNumbers(characterCount, logicalLineCount);
 
-        editor.WordWrap = forceWordWrap || wordWrap;
+        editor.WordWrap = wordWrap;
     }
 }
