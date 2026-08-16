@@ -1,12 +1,12 @@
-# Builds AppIcon.ico from the macOS TextPad icon source (icon_base.png).
+# Builds AppIcon.ico from the Windows project's own icon source.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourcePng = Join-Path (Split-Path -Parent $root) "macos\icon_base.png"
+$sourcePng = Join-Path $root "TextPad\Assets\icon_base.png"
 $assetsDir = Join-Path $root "TextPad\Assets"
 $icoPath = Join-Path $assetsDir "AppIcon.ico"
 
 if (-not (Test-Path $sourcePng)) {
-    throw "Missing macOS icon source: $sourcePng"
+    throw "Missing Windows icon source: $sourcePng"
 }
 
 New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null

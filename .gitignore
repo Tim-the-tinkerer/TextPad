@@ -6,21 +6,24 @@
 macos/.build/
 macos/TextPad.app/
 macos/dist/
-macos/icon.iconset/
-macos/AppIcon.icns
+macos/Resources/AppIcon.icns
+macos/Resources/icon.iconset/
 macos/installer/pkg-work/
 macos/installer/dmg-work/
 
 # --- Windows build outputs ---
-windows-x64/dist/
-windows-x64/TextPad/bin/
-windows-x64/TextPad/obj/
+windows/dist/
+windows/TextPad/bin/
+windows/TextPad/obj/
 
 # Downloaded build tools (Inno Setup, etc.)
-windows-x64/tools/
+windows/tools/
 
 # Local/dev scratch
-windows-x64/_dump_colors.cs
+windows/_dump_colors.cs
+
+# Generated shared fixtures
+shared/fixtures/large-files/*.txt
 
 # --- .NET / Visual Studio ---
 *.user

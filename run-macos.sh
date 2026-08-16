@@ -11,7 +11,7 @@ for arg in "$@"; do
   esac
 done
 
-bash ./build.sh
+bash ./build-macos.sh
 
 if [ "$LAUNCH" = true ]; then
   open macos/TextPad.app

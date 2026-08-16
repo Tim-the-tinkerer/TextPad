@@ -1,0 +1,27 @@
+name: macOS
+
+on:
+  push:
+    paths:
+      - "macos/**"
+      - "shared/**"
+      - ".github/workflows/macos.yml"
+  pull_request:
+    paths:
+      - "macos/**"
+      - "shared/**"
+      - ".github/workflows/macos.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build TextPad for macOS
+        run: bash macos/build.sh
+      - name: Upload application
+        uses: actions/upload-artifact@v4
+        with:
+          name: TextPad-macOS
+          path: macos/TextPad.app

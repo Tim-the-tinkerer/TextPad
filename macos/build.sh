@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
 APP_NAME="TextPad"
 BUILD_DIR=".build"
 APP_DIR="$APP_NAME.app"
+SOURCE_DIR="Sources"
+RESOURCE_DIR="Resources"
 
 echo "Building TextPad for macOS..."
 
@@ -17,7 +19,7 @@ done
 
 if [ -f build_icon.sh ]; then
   if ! bash build_icon.sh; then
-    if [ -f AppIcon.icns ]; then
+    if [ -f "$RESOURCE_DIR/AppIcon.icns" ]; then
       echo "Warning: icon rebuild failed; using existing AppIcon.icns"
     else
       echo "Error: icon build failed and AppIcon.icns is missing"
@@ -51,36 +53,36 @@ swiftc \
   -O \
   -target "$TARGET" \
   -o "$BUILD_DIR/$APP_NAME" \
-  main.swift \
-  CrashLogger.swift \
-  SingleInstanceManager.swift \
-  DocumentExport.swift \
-  LargeFileSupport.swift \
-  SafeFileReader.swift \
-  AppDelegate.swift \
-  AppHelp.swift \
-  EditorPreferences.swift \
-  EditorDocument.swift \
-  DocumentFormat.swift \
-  DocumentEncoding.swift \
-  EncodingOptionsController.swift \
-  FileChangeMonitor.swift \
-  AutoSaveManager.swift \
-  TextSearch.swift \
-  InWindowFindBar.swift \
-  ClosedTabManager.swift \
-  DropReceivingView.swift \
-  RichTextFormatting.swift \
-  PlainTextEditing.swift \
-  CurrentLineHighlightView.swift \
-  EditorViewController.swift \
-  SyntaxHighlighter.swift \
-  LineNumberRuler.swift \
-  FindReplaceController.swift \
-  GoToLineController.swift \
-  DocumentWindowController.swift \
-  PreferencesWindowController.swift \
-  BundledFonts.swift \
+  "$SOURCE_DIR/main.swift" \
+  "$SOURCE_DIR/CrashLogger.swift" \
+  "$SOURCE_DIR/SingleInstanceManager.swift" \
+  "$SOURCE_DIR/DocumentExport.swift" \
+  "$SOURCE_DIR/LargeFileSupport.swift" \
+  "$SOURCE_DIR/SafeFileReader.swift" \
+  "$SOURCE_DIR/AppDelegate.swift" \
+  "$SOURCE_DIR/AppHelp.swift" \
+  "$SOURCE_DIR/EditorPreferences.swift" \
+  "$SOURCE_DIR/EditorDocument.swift" \
+  "$SOURCE_DIR/DocumentFormat.swift" \
+  "$SOURCE_DIR/DocumentEncoding.swift" \
+  "$SOURCE_DIR/EncodingOptionsController.swift" \
+  "$SOURCE_DIR/FileChangeMonitor.swift" \
+  "$SOURCE_DIR/AutoSaveManager.swift" \
+  "$SOURCE_DIR/TextSearch.swift" \
+  "$SOURCE_DIR/InWindowFindBar.swift" \
+  "$SOURCE_DIR/ClosedTabManager.swift" \
+  "$SOURCE_DIR/DropReceivingView.swift" \
+  "$SOURCE_DIR/RichTextFormatting.swift" \
+  "$SOURCE_DIR/PlainTextEditing.swift" \
+  "$SOURCE_DIR/CurrentLineHighlightView.swift" \
+  "$SOURCE_DIR/EditorViewController.swift" \
+  "$SOURCE_DIR/SyntaxHighlighter.swift" \
+  "$SOURCE_DIR/LineNumberRuler.swift" \
+  "$SOURCE_DIR/FindReplaceController.swift" \
+  "$SOURCE_DIR/GoToLineController.swift" \
+  "$SOURCE_DIR/DocumentWindowController.swift" \
+  "$SOURCE_DIR/PreferencesWindowController.swift" \
+  "$SOURCE_DIR/BundledFonts.swift" \
   -framework AppKit \
   -framework Foundation \
   -framework UniformTypeIdentifiers \
@@ -91,21 +93,21 @@ mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
-cp Info.plist "$APP_DIR/Contents/Info.plist"
+cp "$RESOURCE_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
 
-if [ -f AppIcon.icns ]; then
-  cp AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
+if [ -f "$RESOURCE_DIR/AppIcon.icns" ]; then
+  cp "$RESOURCE_DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
   chmod 644 "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
-if [ -f Help.md ]; then
-  cp Help.md "$APP_DIR/Contents/Resources/Help.md"
+if [ -f "$RESOURCE_DIR/Help.md" ]; then
+  cp "$RESOURCE_DIR/Help.md" "$APP_DIR/Contents/Resources/Help.md"
   chmod 644 "$APP_DIR/Contents/Resources/Help.md"
 fi
 
-if [ -d Fonts ]; then
+if [ -d "$RESOURCE_DIR/Fonts" ]; then
   mkdir -p "$APP_DIR/Contents/Resources/Fonts"
-  find Fonts -maxdepth 1 \( -name '*.ttf' -o -name '*.otf' \) -exec cp {} "$APP_DIR/Contents/Resources/Fonts/" \;
+  find "$RESOURCE_DIR/Fonts" -maxdepth 1 \( -name '*.ttf' -o -name '*.otf' \) -exec cp {} "$APP_DIR/Contents/Resources/Fonts/" \;
   chmod 644 "$APP_DIR/Contents/Resources/Fonts/"* 2>/dev/null || true
 fi
 
@@ -115,7 +117,7 @@ chmod a+rX "$APP_DIR/Contents/Resources"
 # Set SIGN_IDENTITY to a keychain identity (e.g. "Developer ID Application: Your Name (TEAMID)")
 # to produce a distributable signature. Defaults to ad-hoc ("-") for local use.
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
-ENTITLEMENTS="TextPad.entitlements"
+ENTITLEMENTS="$RESOURCE_DIR/TextPad.entitlements"
 
 echo "Signing $APP_DIR with identity: $SIGN_IDENTITY"
 codesign --force --sign "$SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" --timestamp "$APP_DIR/Contents/MacOS/$APP_NAME"

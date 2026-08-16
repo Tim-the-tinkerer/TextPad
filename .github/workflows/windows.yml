@@ -1,0 +1,31 @@
+name: Windows
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - "shared/**"
+      - ".github/workflows/windows.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "shared/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build TextPad for Windows
+        shell: pwsh
+        run: .\windows\build.ps1
+      - name: Upload application
+        uses: actions/upload-artifact@v4
+        with:
+          name: TextPad-Windows-x64
+          path: windows/dist/x64
