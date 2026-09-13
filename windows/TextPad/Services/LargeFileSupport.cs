@@ -58,21 +58,16 @@ public static class LargeFileSupport
         return Math.Max(maxLength, current);
     }
 
-    public static bool EffectiveWordWrap(bool preferred, string text) =>
-        preferred && MaxLineLength(text) <= LongLineThreshold;
+    public static bool EffectiveWordWrap(bool preferred, string text)
+    {
+        _ = text;
+        return preferred;
+    }
 
     public static bool ComputeWordWrap(string text)
     {
-        if (!EditorPreferences.Instance.WordWrap)
-            return false;
-
-        if (HasExtremelyLongLines(text))
-            return false;
-
-        if (text.Length > LargeDocumentCharacterThreshold)
-            return false;
-
-        return MaxLineLength(text) <= LongLineThreshold;
+        _ = text;
+        return EditorPreferences.Instance.WordWrap;
     }
 
     public static void ConfigureEditorForContent(TextEditor editor, string text)
@@ -161,6 +156,7 @@ public static class LargeFileSupport
         editor.Options.EnableHyperlinks = false;
         editor.Options.EnableEmailHyperlinks = false;
         editor.ShowLineNumbers = ShouldShowLineNumbers(characterCount, logicalLineCount);
+        _ = forceWordWrap;
 
         editor.WordWrap = wordWrap;
     }

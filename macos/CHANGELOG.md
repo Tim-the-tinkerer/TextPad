@@ -1,5 +1,14 @@
 # TextPad (macOS) Changelog
 
+## Unreleased
+
+### Added
+- Keyboard shortcut for Word Wrap: **⌘\\**.
+
+### Changed
+- Word wrap is now forced wrap: lines break at the window edge, including long words with no spaces.
+- Enabling wrap no longer skips documents with extremely long lines.
+
 ## 1.5.5 — 2026-08-16
 
 ### Added

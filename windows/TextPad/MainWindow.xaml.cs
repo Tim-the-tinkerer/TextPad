@@ -92,6 +92,8 @@ public partial class MainWindow : Window
         BindShortcut(Key.Add, ModifierKeys.Control, () => ZoomIn_Click(this, new RoutedEventArgs()));
         BindShortcut(Key.OemMinus, ModifierKeys.Control, () => ZoomOut_Click(this, new RoutedEventArgs()));
         BindShortcut(Key.Subtract, ModifierKeys.Control, () => ZoomOut_Click(this, new RoutedEventArgs()));
+        BindShortcut(Key.Oem5, ModifierKeys.Control, ToggleWordWrap);
+        BindShortcut(Key.OemBackslash, ModifierKeys.Control, ToggleWordWrap);
         BindShortcut(Key.F1, ModifierKeys.None, OpenHelp);
 
         for (var i = 0; i < 9; i++)
@@ -1142,8 +1144,19 @@ public partial class MainWindow : Window
 
     private void WordWrap_Click(object sender, RoutedEventArgs e)
     {
-        EditorPreferences.Instance.WordWrap = WordWrapItem.IsChecked;
+        SetWordWrap(WordWrapItem.IsChecked);
+    }
+
+    private void ToggleWordWrap()
+    {
+        SetWordWrap(!EditorPreferences.Instance.WordWrap);
+    }
+
+    private void SetWordWrap(bool enabled)
+    {
+        EditorPreferences.Instance.WordWrap = enabled;
         EditorPreferences.Instance.Save();
+        WordWrapItem.IsChecked = enabled;
         ApplyThemeToAllTabs();
     }
 

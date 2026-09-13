@@ -167,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(withTitle: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
         viewMenu.addItem(NSMenuItem.separator())
         viewMenu.addItem(withTitle: "Toggle Line Numbers", action: #selector(toggleLineNumbers), keyEquivalent: "l").keyEquivalentModifierMask = [.command, .shift]
-        viewMenu.addItem(withTitle: "Toggle Word Wrap", action: #selector(toggleWordWrap), keyEquivalent: "")
+        viewMenu.addItem(withTitle: "Toggle Word Wrap", action: #selector(toggleWordWrap), keyEquivalent: "\\")
         viewMenu.addItem(withTitle: "Toggle Invisibles", action: #selector(toggleInvisibles), keyEquivalent: "i").keyEquivalentModifierMask = [.command, .option]
         viewMenu.addItem(withTitle: "Toggle Current Line Highlight", action: #selector(toggleCurrentLineHighlight), keyEquivalent: "")
         viewMenu.addItem(NSMenuItem.separator())
@@ -803,6 +803,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
              #selector(openHelp(_:)),
              #selector(runPageLayout(_:)), #selector(bringAllToFront(_:)):
             return true
+        case #selector(toggleWordWrap(_:)):
+            menuItem.state = EditorPreferences.shared.wordWrap ? .on : .off
+            return hasEditor
         case #selector(newTab(_:)), #selector(closeTab(_:)), #selector(closeWindow(_:)),
              #selector(saveDocumentAction(_:)), #selector(saveDocumentAsAction(_:)),
              #selector(printDocument(_:)),
@@ -810,7 +813,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
              #selector(findNext(_:)), #selector(findPrevious(_:)),
              #selector(reopenClosedTab(_:)),
              #selector(showGoToLine(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
-             #selector(toggleLineNumbers(_:)), #selector(toggleWordWrap(_:)),
+             #selector(toggleLineNumbers(_:)),
              #selector(toggleInvisibles(_:)), #selector(toggleCurrentLineHighlight(_:)),
              #selector(setLanguage(_:)), #selector(toggleBoldface(_:)),
              #selector(toggleItalics(_:)), #selector(underline(_:)),

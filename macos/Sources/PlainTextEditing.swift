@@ -9,15 +9,17 @@ enum PlainTextEditing {
         "'": "'"
     ]
 
-    static func applyTabWidth(to textView: NSTextView, font: NSFont, tabWidth: Int) {
+    static func applyTabWidth(to textView: NSTextView, font: NSFont, tabWidth: Int, wordWrap: Bool) {
         let charWidth = (" " as NSString).size(withAttributes: [.font: font]).width
         let interval = charWidth * CGFloat(max(1, tabWidth))
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.defaultTabInterval = interval
         paragraph.tabStops = []
+        paragraph.lineBreakMode = wordWrap ? .byCharWrapping : .byClipping
 
         textView.font = font
+        textView.defaultParagraphStyle = paragraph
         var typing = textView.typingAttributes
         typing[.font] = font
         typing[.paragraphStyle] = paragraph

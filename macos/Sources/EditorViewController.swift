@@ -201,11 +201,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.insertionPointColor = theme.text
         scrollView.backgroundColor = theme.background
 
-        let initialWrap = LargeFileSupport.effectiveWordWrap(
-            preferred: EditorPreferences.shared.wordWrap,
-            text: document.content
-        )
-        applyPreferences(wordWrap: initialWrap)
+        applyPreferences()
         LargeFileSupport.updateSizeToFitContent(textView: textView, scrollView: scrollView)
         updateStatusBar()
         textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
@@ -242,6 +238,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
         let prefs = EditorPreferences.shared
         let theme = prefs.effectiveTheme
+        let wordWrap = override ?? LargeFileSupport.effectiveWordWrap(
+            preferred: prefs.wordWrap,
+            text: textView.string
+        )
         let isLargeDocument = (textView.textStorage?.length ?? 0) > LargeFileSupport.largeDocumentThreshold
         inWindowFindBar.applyTheme(theme)
 
@@ -264,7 +264,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 .backgroundColor: theme.selection,
                 .foregroundColor: theme.text
             ]
-            PlainTextEditing.applyTabWidth(to: textView, font: prefs.font, tabWidth: prefs.tabWidth)
+            PlainTextEditing.applyTabWidth(to: textView, font: prefs.font, tabWidth: prefs.tabWidth, wordWrap: wordWrap)
             PlainTextEditing.configureInvisibles(on: textView, show: prefs.showInvisibles && !isLargeDocument)
 
             if let storage = textView.textStorage, storage.length > 0, !isLargeDocument {
@@ -276,7 +276,6 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             }
         }
 
-        let wordWrap = override ?? prefs.wordWrap
         LargeFileSupport.configureScrollable(textView, scrollView: scrollView, wordWrap: wordWrap)
 
         if prefs.showLineNumbers && !isLargeDocument {

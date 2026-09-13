@@ -306,7 +306,7 @@
                 <MenuItem Header="Zoom _In" InputGestureText="Ctrl++" Click="ZoomIn_Click"/>
                 <MenuItem Header="Zoom _Out" InputGestureText="Ctrl+-" Click="ZoomOut_Click"/>
                 <Separator/>
-                <MenuItem x:Name="WordWrapItem" Header="Word _Wrap" IsCheckable="True" Click="WordWrap_Click"/>
+                <MenuItem x:Name="WordWrapItem" Header="Word _Wrap" InputGestureText="Ctrl+\" IsCheckable="True" Click="WordWrap_Click"/>
                 <MenuItem x:Name="LineNumbersItem" Header="_Line Numbers" IsCheckable="True" Click="LineNumbers_Click"/>
                 <MenuItem x:Name="InvisiblesItem" Header="Show _Invisibles" IsCheckable="True" Click="Invisibles_Click"/>
                 <MenuItem x:Name="CurrentLineItem" Header="_Highlight Current Line" IsCheckable="True" Click="CurrentLine_Click"/>

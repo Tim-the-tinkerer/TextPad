@@ -24,7 +24,8 @@ enum LargeFileSupport {
     }
 
     static func effectiveWordWrap(preferred: Bool, text: String) -> Bool {
-        preferred && maxLineLength(in: text) <= longLineThreshold
+        _ = text
+        return preferred
     }
 
     static func configureScrollable(_ textView: NSTextView, scrollView: NSScrollView, wordWrap: Bool) {
@@ -52,6 +53,34 @@ enum LargeFileSupport {
             )
             textView.isHorizontallyResizable = true
             textView.minSize = NSSize(width: contentSize.width, height: contentSize.height)
+        }
+
+        applyForcedWrap(to: textView, wordWrap: wordWrap)
+    }
+
+    /// When wrap is on, break at the window edge even mid-word so long tokens
+    /// (JSON, minified JS, base64) stay in view instead of scrolling sideways.
+    /// Rich text keeps the document's own paragraph wrapping.
+    static func applyForcedWrap(to textView: NSTextView, wordWrap: Bool) {
+        guard !textView.isRichText else { return }
+        let mode: NSLineBreakMode = wordWrap ? .byCharWrapping : .byClipping
+        let paragraph: NSMutableParagraphStyle
+        if let existing = (textView.defaultParagraphStyle ?? textView.typingAttributes[.paragraphStyle] as? NSParagraphStyle)?
+            .mutableCopy() as? NSMutableParagraphStyle
+        {
+            paragraph = existing
+        } else {
+            paragraph = NSMutableParagraphStyle()
+        }
+        paragraph.lineBreakMode = mode
+        textView.defaultParagraphStyle = paragraph
+
+        var typing = textView.typingAttributes
+        typing[.paragraphStyle] = paragraph
+        textView.typingAttributes = typing
+
+        if let storage = textView.textStorage, storage.length > 0 {
+            storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length))
         }
     }
 

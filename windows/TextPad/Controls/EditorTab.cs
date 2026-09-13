@@ -539,8 +539,7 @@ public sealed class EditorTab : IDisposable
         PlainEditor!.ShowLineNumbers = LargeFileSupport.ShouldShowLineNumbers(
             PlainEditor.Document.TextLength,
             LargeFileSupport.CountLogicalLines(PlainEditor.Document.Text));
-        PlainEditor.WordWrap = Document.ForceWordWrap
-            || (PlainEditor.Document.TextLength <= LargeFileSupport.LargeDocumentCharacterThreshold && prefs.WordWrap);
+        PlainEditor.WordWrap = prefs.WordWrap;
         PlainEditor.FontFamily = BundledFonts.Resolve(prefs.FontFamily);
         PlainEditor.FontSize = prefs.FontSize;
         PlainEditor.Options.IndentationSize = prefs.TabWidth;

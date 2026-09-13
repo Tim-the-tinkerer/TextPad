@@ -96,7 +96,7 @@ Available when the document is rich text (RTF):
 |--------|----------|-------------|
 | Zoom In / Out | ⌘+ / ⌘- | Increase or decrease font size |
 | Toggle Line Numbers | ⌘⇧L | Show or hide the gutter |
-| Toggle Word Wrap | — | Wrap long lines |
+| Toggle Word Wrap | ⌘\\ | Wrap lines at the window edge, including long words |
 | Toggle Invisibles | ⌘⌥I | Display spaces, tabs, and line endings |
 | Toggle Current Line Highlight | — | Shade the line containing the caret |
 | Syntax Highlighting | — | Pick a language manually |
@@ -130,7 +130,7 @@ Open via **TextPad → Preferences** (**⌘,**).
 | Font size | 8–72 pt |
 | Tab width | Spaces per tab when converting tabs |
 | Line endings on save | Preserve, LF, or CRLF |
-| Word wrap | Enable wrapping for normal-sized lines |
+| Word wrap | Wrap lines at the window edge, including long words |
 | Show line numbers | Gutter on/off |
 | Highlight current line | Current-line highlight on/off |
 | Show invisible characters | Whitespace markers on/off |
@@ -144,7 +144,7 @@ Preferences are stored in macOS **UserDefaults** under the `com.textpad.editor` 
 ## Large files
 
 - Files over **100 MB** cannot be opened.
-- Very long lines (**> 8,000 characters**) automatically disable word wrap on open for readability.
+- Word wrap, when enabled, is forced wrap: long lines and long words break at the window edge.
 - Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
 - The editor grows with content so large files scroll correctly.
 
@@ -241,6 +241,7 @@ Paths with spaces should be quoted. Additional launches forward files to the run
 
 ### View
 - ⌘+ / ⌘- — Zoom in / out
+- ⌘\\ — Toggle word wrap
 - ⌘⇧L — Toggle line numbers
 - ⌘⌥I — Toggle invisibles
 

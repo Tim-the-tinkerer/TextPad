@@ -1,5 +1,14 @@
 # TextPad (Windows) Changelog
 
+## Unreleased
+
+### Added
+- Keyboard shortcut for Word Wrap: **Ctrl+\\**.
+
+### Changed
+- Word wrap now follows the View menu setting even for extremely long lines and large documents.
+- Disabling wrap no longer keeps wrap forced on for long-line files.
+
 ## 1.5.5 — 2026-08-16
 
 ### Added

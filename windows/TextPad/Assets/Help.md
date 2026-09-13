@@ -95,7 +95,7 @@ Available when the document is rich text (RTF):
 | Option | Description |
 |--------|-------------|
 | Zoom In / Out | Ctrl++ / Ctrl+- |
-| Word Wrap | Wrap long lines (see Large files below) |
+| Word Wrap | Ctrl+\\ — wrap lines at the window edge, including long lines |
 | Line Numbers | Show or hide the gutter |
 | Show Invisibles | Display spaces, tabs, and line endings |
 | Highlight Current Line | Shade the line containing the caret |
@@ -132,7 +132,7 @@ Open via **View → Preferences**.
 | Font size | 8–72 pt |
 | Tab width | Spaces per tab when converting tabs |
 | Line endings on save | Preserve, LF, or CRLF |
-| Word wrap | Enable wrapping for normal-sized lines |
+| Word wrap | Wrap lines at the window edge, including long lines |
 | Show line numbers | Gutter on/off |
 | Highlight current line | Current-line highlight on/off |
 | Show invisible characters | Whitespace markers on/off |
@@ -150,7 +150,7 @@ Preferences are stored in:
 TextPad uses two editors:
 
 1. **Standard editor** — Full syntax highlighting, find, and editing for typical files.
-2. **Large-file editor** — Used when a file is **≥ 500 KB** and contains lines longer than **8,000 characters**. Uses a fast wrapped-text view with line numbers and word wrap forced on for readability.
+2. **Large-file editor** — Used when a file is **≥ 500 KB** and contains lines longer than **8,000 characters**. Uses a fast wrapped-text view with line numbers. Word wrap follows the View menu setting.
 
 Very large single-line files (for example multi-megabyte JSON or data exports) open without freezing the UI. Plain-text files load on a background thread; the tab title shows a loading indicator until content is ready.
 
@@ -248,6 +248,7 @@ Paths with spaces should be quoted. Additional launches forward files to the run
 
 ### View
 - Ctrl++ / Ctrl+- — Zoom in / out
+- Ctrl+\\ — Toggle word wrap
 
 ### Window
 - Ctrl+Tab / Ctrl+Shift+Tab — Next / previous tab
