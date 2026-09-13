@@ -747,7 +747,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.5"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.6"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "TextPad",
             .applicationVersion: version,

@@ -4,8 +4,8 @@ TextPad is a lightweight text editor for macOS and Windows, inspired by BBEdit a
 
 | Platform | Current version | Implementation | Project |
 |---|---:|---|---|
-| macOS | 1.5.5 | Swift and AppKit | [`macos/`](macos/) |
-| Windows | 1.5.5 | C#, WPF and .NET 8 | [`windows/`](windows/) |
+| macOS | 1.5.6 | Swift and AppKit | [`macos/`](macos/) |
+| Windows | 1.5.6 | C#, WPF and .NET 8 | [`windows/`](windows/) |
 
 ## Repository layout
 
@@ -59,8 +59,8 @@ See the platform README for requirements, installer commands and output location
 
 Use independent tags and GitHub releases:
 
-- `macos-v1.5.5`
-- `windows-v1.5.5`
+- `macos-v1.5.6`
+- `windows-v1.5.6`
 
 Each release should contain only that platform's binaries. See [`docs/releasing.md`](docs/releasing.md).
 

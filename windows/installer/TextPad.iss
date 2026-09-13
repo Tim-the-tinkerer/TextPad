@@ -1,6 +1,6 @@
 ; TextPad Windows installer (Inno Setup 6) — 64-bit only
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.5"
+  #define MyAppVersion "1.5.6"
 #endif
 #ifndef MyAppSource
   #define MyAppSource "..\dist\x64-installer"

@@ -19,12 +19,19 @@ The two TextPad editions do not share source code, but they should agree on thes
 - Application themes must not broadly recolor the stored document.
 - Any readability repair that changes an attributed run should be documented because it can affect saved RTF.
 
+## Word wrap
+
+- When wrap is enabled, lines break at the window edge, including long words with no spaces.
+- Wrap is not disabled automatically for extremely long lines.
+- Rich text keeps the document's own paragraph wrapping.
+
 ## Large documents
 
 - Files up to 256 MB may be opened, subject to available memory.
 - Syntax coloring and visual embellishments may be disabled above the large-document threshold.
 - Opening should not force complete document layout before the first viewport appears.
 - Large documents should not produce autosave snapshots above the snapshot limit.
+- Word wrap still follows the user setting on large documents.
 
 ## Regression fixtures
 

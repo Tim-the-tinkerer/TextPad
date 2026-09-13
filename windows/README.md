@@ -2,7 +2,7 @@
 
 The native Windows edition of TextPad is implemented in C#, WPF and .NET 8. AvalonEdit provides the plain-text editing surface.
 
-**Current version:** 1.5.5  
+**Current version:** 1.5.6  
 **Minimum system:** Windows 10 x64  
 **Project:** `TextPad/TextPad.csproj`
 

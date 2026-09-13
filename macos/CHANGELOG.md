@@ -1,6 +1,6 @@
 # TextPad (macOS) Changelog
 
-## Unreleased
+## 1.5.6 — 2026-09-13
 
 ### Added
 - Keyboard shortcut for Word Wrap: **⌘\\**.

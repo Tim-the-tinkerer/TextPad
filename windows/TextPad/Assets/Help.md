@@ -2,6 +2,8 @@
 
 TextPad is a lightweight **64-bit** text editor for Windows. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
+**Version 1.5.6**
+
 ---
 
 ## Getting started
@@ -147,14 +149,10 @@ Preferences are stored in:
 
 ## Large files
 
-TextPad uses two editors:
-
-1. **Standard editor** — Full syntax highlighting, find, and editing for typical files.
-2. **Large-file editor** — Used when a file is **≥ 500 KB** and contains lines longer than **8,000 characters**. Uses a fast wrapped-text view with line numbers. Word wrap follows the View menu setting.
-
-Very large single-line files (for example multi-megabyte JSON or data exports) open without freezing the UI. Plain-text files load on a background thread; the tab title shows a loading indicator until content is ready.
-
-Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
+- Files over **256 MB** cannot be opened.
+- Word wrap, when enabled, wraps at the window edge, including extremely long lines.
+- Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
+- Very large single-line files (for example multi-megabyte JSON or data exports) open without freezing the UI. Plain-text files load on a background thread; the tab title shows a loading indicator until content is ready.
 
 ---
 

@@ -2,6 +2,8 @@
 
 TextPad is a lightweight text editor for macOS. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
+**Version 1.5.6**
+
 ---
 
 ## Getting started
@@ -143,7 +145,7 @@ Preferences are stored in macOS **UserDefaults** under the `com.textpad.editor` 
 
 ## Large files
 
-- Files over **100 MB** cannot be opened.
+- Files over **256 MB** cannot be opened.
 - Word wrap, when enabled, is forced wrap: long lines and long words break at the window edge.
 - Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
 - The editor grows with content so large files scroll correctly.

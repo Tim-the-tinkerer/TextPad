@@ -2,7 +2,7 @@
 
 The native macOS edition of TextPad is implemented in Swift and AppKit.
 
-**Current version:** 1.5.5  
+**Current version:** 1.5.6  
 **Minimum system:** macOS 11  
 **Source:** `Sources/`  
 **Application resources:** `Resources/`
