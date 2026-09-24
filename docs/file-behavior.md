@@ -16,8 +16,9 @@ The two TextPad editions do not share source code, but they should agree on thes
 - Standard `.rtf` is supported.
 - `.rtfd` packages are not supported and must produce a clear error.
 - Named fonts should survive open, editing and save whenever the native RTF stack exposes them.
-- Application themes must not broadly recolor the stored document.
-- Any readability repair that changes an attributed run should be documented because it can affect saved RTF.
+- The editor presents RTF using the current application theme. Body text and the page follow the theme; saturated accents and table cell fills stay as in the document when they remain readable.
+- Theme presentation must not replace stored RTF colors on save unless the user has edited the document. macOS uses display-only attributes; Windows writes the original bytes for an unedited file.
+- Any readability repair that changes an attributed run should be documented because it can affect saved RTF after an edit.
 
 ## Word wrap
 

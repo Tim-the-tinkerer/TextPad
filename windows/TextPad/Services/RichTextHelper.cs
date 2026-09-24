@@ -416,81 +416,23 @@ public static class RichTextHelper
 
     public static void ApplyTheme(RichTextBox editor, EditorTheme theme)
     {
-        // Present RTF on a conventional paper surface. Do not restyle the
-        // document for the application theme; only lift ink that cannot be
-        // read on that surface (e.g. Cocoa #F0F2EB on white).
-        editor.Background = Brushes.White;
-        editor.Foreground = Brushes.Black;
+        var background = new SolidColorBrush(theme.Background);
+        background.Freeze();
+        var foreground = new SolidColorBrush(theme.Text);
+        foreground.Freeze();
+        editor.Background = background;
+        editor.Foreground = foreground;
+        editor.CaretBrush = foreground;
+        editor.Document.Background = background;
+        editor.Document.Foreground = foreground;
 
         var selectionBrush = new SolidColorBrush(theme.Selection);
         selectionBrush.Freeze();
-        var selectionForeground = new SolidColorBrush(theme.Text);
-        selectionForeground.Freeze();
         editor.SelectionBrush = selectionBrush;
-        editor.SelectionTextBrush = selectionForeground;
+        editor.SelectionTextBrush = foreground;
         editor.SelectionOpacity = 1.0;
 
-        EnsureReadableForegrounds(editor.Document);
-    }
-
-    private static void EnsureReadableForegrounds(FlowDocument document) =>
-        EnsureReadableForegrounds(document.Blocks, Luminance(Colors.White));
-
-    private static void EnsureReadableForegrounds(IEnumerable<Block> blocks, double surfaceLuminance)
-    {
-        foreach (var block in blocks)
-        {
-            switch (block)
-            {
-                case Paragraph paragraph:
-                    LiftIfUnreadable(paragraph, surfaceLuminance);
-                    EnsureReadableInlines(paragraph.Inlines, surfaceLuminance);
-                    break;
-                case Section section:
-                    EnsureReadableForegrounds(section.Blocks, surfaceLuminance);
-                    break;
-                case List list:
-                    foreach (ListItem item in list.ListItems)
-                        EnsureReadableForegrounds(item.Blocks, surfaceLuminance);
-                    break;
-                case Table table:
-                    foreach (var rowGroup in table.RowGroups)
-                    foreach (var row in rowGroup.Rows)
-                    foreach (var cell in row.Cells)
-                    {
-                        var cellColor = GetBrushColor(cell.Background, Colors.Transparent);
-                        var luminance = cellColor.A > 51 ? Luminance(cellColor) : surfaceLuminance;
-                        EnsureReadableForegrounds(cell.Blocks, luminance);
-                    }
-                    break;
-            }
-        }
-    }
-
-    private static void EnsureReadableInlines(InlineCollection inlines, double surfaceLuminance)
-    {
-        foreach (var inline in inlines)
-        {
-            LiftIfUnreadable(inline, surfaceLuminance);
-            if (inline is Span span)
-                EnsureReadableInlines(span.Inlines, surfaceLuminance);
-        }
-    }
-
-    private static void LiftIfUnreadable(TextElement element, double surfaceLuminance)
-    {
-        if (element.ReadLocalValue(TextElement.ForegroundProperty) == DependencyProperty.UnsetValue)
-            return;
-
-        var foreground = GetBrushColor(element.Foreground, Colors.Transparent);
-        if (foreground.A <= 16)
-            return;
-        if (Saturation(foreground) > 0.18)
-            return;
-        if (ContrastRatio(Luminance(foreground), surfaceLuminance) >= 3.0)
-            return;
-
-        element.Foreground = Brushes.Black;
+        RemapDocumentColors(editor.Document, theme);
     }
 
     public static void ApplyExportTheme(RichTextBox editor)

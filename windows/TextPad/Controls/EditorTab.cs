@@ -319,7 +319,14 @@ public sealed class EditorTab : IDisposable
         }
     }
 
-    public byte[] GetRtfBytes() => RichTextHelper.SaveRtf(RichEditor!);
+    public byte[] GetRtfBytes()
+    {
+        // Theme remapping mutates the live FlowDocument. Unedited files keep
+        // the bytes that were loaded so Save does not bake the theme into RTF.
+        if (!Document.IsDirty && Document.RtfData is { Length: > 0 } original)
+            return original;
+        return RichTextHelper.SaveRtf(RichEditor!);
+    }
 
     public void Focus()
     {

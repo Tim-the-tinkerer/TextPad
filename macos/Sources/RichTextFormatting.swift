@@ -28,69 +28,107 @@ enum RichTextFormatting {
     }
 
     static func applyTheme(_ theme: EditorTheme, to textView: NSTextView) {
-        // RTF is a page-oriented interchange format. Present it on a neutral
-        // paper surface so its own colors remain readable without rewriting them.
-        let paper = NSColor.white
-        let ink = NSColor.black
-        textView.backgroundColor = paper
+        // Paint the RTF page with the application theme. Do not assign
+        // textView.font or textView.textColor — both rewrite every run and
+        // would discard the RTF font table. Display remapping uses layout
+        // manager temporary attributes so stored RTF colors stay intact.
+        textView.backgroundColor = theme.background
         textView.drawsBackground = true
-        textView.insertionPointColor = ink
-        // Do not assign textView.font or textView.textColor. Both rewrite
-        // document runs and would discard the RTF font table and colors.
-        textView.typingAttributes = typingAttributesPreservingDocument(in: textView, ink: ink)
+        textView.insertionPointColor = theme.text
+        textView.appearance = NSAppearance(named: theme.isDark ? .darkAqua : .aqua)
+        textView.typingAttributes = typingAttributesPreservingDocument(in: textView, theme: theme)
         textView.selectedTextAttributes = [
             .backgroundColor: theme.selection,
-            .foregroundColor: ink
+            .foregroundColor: theme.text
         ]
         textView.linkTextAttributes = [
             .foregroundColor: theme.uiAccent,
             .underlineStyle: NSUnderlineStyle.single.rawValue
         ]
+        applyDisplayColors(theme: theme, to: textView)
+    }
 
-        // Lift only ink that is unreadable on the paper/cell surface
-        // (e.g. Cocoa RTF that paints #F0F2EB on white). Do not restyle
-        // readable colors or apply an application theme to the document.
-        ensureReadableForegrounds(in: textView, paper: paper)
+    static func syncTypingAttributes(_ theme: EditorTheme, to textView: NSTextView) {
+        textView.typingAttributes = typingAttributesPreservingDocument(in: textView, theme: theme)
+    }
+
+    static func refreshDisplayColors(_ theme: EditorTheme, to textView: NSTextView) {
+        applyDisplayColors(theme: theme, to: textView)
+        syncTypingAttributes(theme, to: textView)
     }
 
     private static let minimumReadableContrast: CGFloat = 3.0
+    private static let displayColorKeys: [NSAttributedString.Key] = [
+        .foregroundColor, .backgroundColor, .underlineColor
+    ]
 
-    private static func ensureReadableForegrounds(in textView: NSTextView, paper: NSColor) {
-        guard let storage = textView.textStorage, storage.length > 0 else { return }
+    private static func applyDisplayColors(theme: EditorTheme, to textView: NSTextView) {
+        guard let storage = textView.textStorage, let layout = textView.layoutManager else { return }
+        clearDisplayColors(in: textView)
+        guard storage.length > 0 else { return }
         let full = NSRange(location: 0, length: storage.length)
-        storage.beginEditing()
-        liftUnreadableColor(in: storage, attribute: .foregroundColor, range: full, paper: paper)
-        liftUnreadableColor(in: storage, attribute: .underlineColor, range: full, paper: paper)
-        storage.endEditing()
-    }
 
-    private static func liftUnreadableColor(
-        in storage: NSTextStorage,
-        attribute: NSAttributedString.Key,
-        range: NSRange,
-        paper: NSColor
-    ) {
-        storage.enumerateAttribute(attribute, in: range) { value, run, _ in
-            guard let color = value as? NSColor else { return }
-            let background = effectiveBackgroundLuminance(at: run.location, in: storage, editorBackground: paper)
-            let components = colorComponents(color)
-            guard components.alpha > 0.2 else { return }
-            guard components.saturation <= 0.18 else { return }
-            guard contrastRatio(foreground: components.luminance, background: background) < minimumReadableContrast else {
+        storage.enumerateAttributes(in: full, options: []) { attributes, run, _ in
+            if attributes[.link] != nil {
                 return
             }
-            storage.addAttribute(attribute, value: preferredTextColor(forBackgroundLuminance: background, theme: .light), range: run)
+
+            let backgroundLuminance = effectiveBackgroundLuminance(
+                at: run.location,
+                in: storage,
+                editorBackground: theme.background
+            )
+
+            if let background = attributes[.backgroundColor] as? NSColor {
+                if shouldRemapHighlight(background, for: theme) {
+                    layout.addTemporaryAttribute(.backgroundColor, value: theme.selection, forCharacterRange: run)
+                } else if shouldRemapDocumentBackground(background, for: theme) {
+                    layout.addTemporaryAttribute(.backgroundColor, value: theme.background, forCharacterRange: run)
+                }
+            }
+
+            let foreground = (attributes[.foregroundColor] as? NSColor) ?? .black
+            let components = colorComponents(foreground)
+            if shouldNormalizeForeground(components: components, backgroundLuminance: backgroundLuminance, theme: theme) {
+                let ink = preferredTextColor(forBackgroundLuminance: backgroundLuminance, theme: theme)
+                layout.addTemporaryAttribute(.foregroundColor, value: ink, forCharacterRange: run)
+            } else if theme.isDark, shouldBrightenAccent(components, backgroundLuminance: backgroundLuminance) {
+                layout.addTemporaryAttribute(.foregroundColor, value: brightenForDarkTheme(foreground), forCharacterRange: run)
+            }
+
+            if let underline = attributes[.underlineColor] as? NSColor {
+                let underlineComponents = colorComponents(underline)
+                if shouldNormalizeForeground(
+                    components: underlineComponents,
+                    backgroundLuminance: backgroundLuminance,
+                    theme: theme
+                ) {
+                    layout.addTemporaryAttribute(
+                        .underlineColor,
+                        value: preferredTextColor(forBackgroundLuminance: backgroundLuminance, theme: theme),
+                        forCharacterRange: run
+                    )
+                }
+            }
+        }
+    }
+
+    private static func clearDisplayColors(in textView: NSTextView) {
+        guard let storage = textView.textStorage, let layout = textView.layoutManager else { return }
+        let full = NSRange(location: 0, length: storage.length)
+        for key in displayColorKeys {
+            layout.removeTemporaryAttribute(key, forCharacterRange: full)
         }
     }
 
     private static func typingAttributesPreservingDocument(
         in textView: NSTextView,
-        ink: NSColor
+        theme: EditorTheme
     ) -> [NSAttributedString.Key: Any] {
         guard let storage = textView.textStorage, storage.length > 0 else {
             return [
                 .font: NSFont.systemFont(ofSize: EditorPreferences.shared.fontSize),
-                .foregroundColor: ink
+                .foregroundColor: theme.text
             ]
         }
 
@@ -99,8 +137,20 @@ enum RichTextFormatting {
         if attributes[.font] == nil {
             attributes[.font] = NSFont.systemFont(ofSize: EditorPreferences.shared.fontSize)
         }
-        if attributes[.foregroundColor] == nil {
-            attributes[.foregroundColor] = ink
+
+        let backgroundLuminance = effectiveBackgroundLuminance(
+            at: location,
+            in: storage,
+            editorBackground: theme.background
+        )
+        let foreground = (attributes[.foregroundColor] as? NSColor) ?? .black
+        let components = colorComponents(foreground)
+        if shouldNormalizeForeground(components: components, backgroundLuminance: backgroundLuminance, theme: theme) {
+            attributes[.foregroundColor] = preferredTextColor(forBackgroundLuminance: backgroundLuminance, theme: theme)
+        } else if theme.isDark, shouldBrightenAccent(components, backgroundLuminance: backgroundLuminance) {
+            attributes[.foregroundColor] = brightenForDarkTheme(foreground)
+        } else if attributes[.foregroundColor] == nil {
+            attributes[.foregroundColor] = theme.text
         }
         return attributes
     }
@@ -135,16 +185,6 @@ enum RichTextFormatting {
         )
     }
 
-    private static func resolvedDocumentColor(_ color: NSColor?, for theme: EditorTheme) -> NSColor? {
-        guard let color else { return nil }
-        let appearance = NSAppearance(named: theme.isDark ? .darkAqua : .aqua) ?? NSApp.effectiveAppearance
-        var resolved = color
-        appearance.performAsCurrentDrawingAppearance {
-            resolved = color.usingColorSpace(.sRGB) ?? color
-        }
-        return resolved
-    }
-
     private static func effectiveBackgroundLuminance(
         at index: Int,
         in storage: NSTextStorage,
@@ -174,13 +214,46 @@ enum RichTextFormatting {
     private static func shouldNormalizeForeground(
         components: ColorComponents,
         backgroundLuminance: CGFloat,
-        theme: EditorTheme
+        theme _: EditorTheme
     ) -> Bool {
-        if components.saturation > 0.18 {
-            return false
+        if components.alpha <= 0.06 {
+            return true
         }
 
+        let isNearBlack = components.luminance < 0.18
+        let isNearWhite = components.luminance > 0.85
+        let isNeutral = components.saturation <= 0.18
+            || (isNearBlack && components.saturation < 0.5)
+            || (isNearWhite && components.saturation < 0.5)
+        guard isNeutral else { return false }
+
         return contrastRatio(foreground: components.luminance, background: backgroundLuminance) < minimumReadableContrast
+    }
+
+    private static func shouldBrightenAccent(_ components: ColorComponents, backgroundLuminance: CGFloat) -> Bool {
+        guard components.alpha > 0.06, backgroundLuminance < 0.5 else { return false }
+        guard components.saturation > 0.18 else { return false }
+        return contrastRatio(foreground: components.luminance, background: backgroundLuminance) < minimumReadableContrast
+    }
+
+    private static func brightenForDarkTheme(_ color: NSColor) -> NSColor {
+        var components = colorComponents(color)
+        let targetBackground: CGFloat = 0.15
+        for _ in 0..<8 {
+            if contrastRatio(foreground: components.luminance, background: targetBackground) >= 3.5 {
+                break
+            }
+            let r = min(1, components.red + (1 - components.red) * 0.28)
+            let g = min(1, components.green + (1 - components.green) * 0.28)
+            let b = min(1, components.blue + (1 - components.blue) * 0.28)
+            components = colorComponents(NSColor(calibratedRed: r, green: g, blue: b, alpha: components.alpha))
+        }
+        return NSColor(
+            calibratedRed: components.red,
+            green: components.green,
+            blue: components.blue,
+            alpha: components.alpha
+        )
     }
 
     private static func preferredTextColor(forBackgroundLuminance backgroundLuminance: CGFloat, theme: EditorTheme) -> NSColor {
@@ -479,6 +552,18 @@ extension RichTextFormatting {
     static func pdfData(from textView: NSTextView) -> Data? {
         guard let layoutManager = textView.layoutManager,
               let container = textView.textContainer else { return nil }
+
+        let previousBackground = textView.backgroundColor
+        let previousAppearance = textView.appearance
+        clearDisplayColors(in: textView)
+        textView.backgroundColor = .white
+        textView.appearance = NSAppearance(named: .aqua)
+        defer {
+            textView.backgroundColor = previousBackground
+            textView.appearance = previousAppearance
+            applyDisplayColors(theme: EditorPreferences.shared.effectiveTheme, to: textView)
+        }
+
         let used = layoutManager.usedRect(for: container)
         let width = max(used.width + textView.textContainerInset.width * 2 + 32, 612)
         let height = max(used.height + textView.textContainerInset.height * 2 + 32, 792)

@@ -8,6 +8,7 @@
 ### Changed
 - Word wrap now follows the View menu setting even for extremely long lines and large documents.
 - Disabling wrap no longer keeps wrap forced on for long-line files.
+- Rich text uses the current editor theme for the page and body text. Named fonts, readable accents, and table fills are kept. Saving an unedited file writes the original RTF bytes so the theme is not baked in.
 
 ## 1.5.5 — 2026-08-16
 

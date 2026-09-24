@@ -40,7 +40,7 @@ Only one TextPad window runs at a time. Opening TextPad again (or double-clickin
 ### Supported formats
 
 - **Plain text** — Any text file; encoding detected or chosen on open. Unrecognized encodings fall back to Windows Latin-1 (CP-1252) so unusual files can still be opened.
-- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables and the fonts named in the document. The editor theme does not replace those fonts. Ink that is too close to the paper color is darkened so the page stays readable. Use Format → Make Plain Text to convert to plain text.
+- **Rich text (RTF)** — Opened and edited with full formatting, including email receipts with tables and the fonts named in the document. The page and body text follow the current editor theme. Named fonts are kept; readable accents and table fills stay as they are. Use Format → Make Plain Text to convert to plain text.
 
 ### Character encodings
 
@@ -267,7 +267,7 @@ This is intentional. Files are sent to the already-running instance.
 Use File → Open with Encoding and pick the correct encoding, or File → Document Encoding on an open file. In the Open dialog, choose **All files (*.*)** if your file type is not listed.
 
 **RTF text is faint or hard to read**  
-Email receipts and similar RTF files often use light gray on white. TextPad normalizes low-contrast text automatically; try switching themes if colors still look wrong.
+Email receipts and similar RTF files often use light gray or near-black body text. TextPad remaps that ink to the current theme so it stays readable. Switch themes if a document still looks wrong.
 
 **Slow or frozen on a huge file**  
 Very large and single-line files stay in the standard editor. TextPad automatically disables expensive presentation features when needed.

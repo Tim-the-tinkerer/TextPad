@@ -8,6 +8,7 @@
 ### Changed
 - Word wrap is now forced wrap: lines break at the window edge, including long words with no spaces.
 - Enabling wrap no longer skips documents with extremely long lines.
+- Rich text uses the current editor theme for the page and body text. Named fonts, readable accents, and table fills are kept. Stored RTF colors are not rewritten; theme contrast is applied only for display.
 
 ## 1.5.5 — 2026-08-16
 

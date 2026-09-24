@@ -5,7 +5,7 @@ This table records intended support, not shared implementation. A checked featur
 | Feature | macOS | Windows | Notes |
 |---|:---:|:---:|---|
 | Plain-text editing | ✓ | ✓ | AppKit text system / AvalonEdit |
-| RTF editing | ✓ | ✓ | Platform-native RTF importers differ |
+| RTF editing | ✓ | ✓ | Platform-native RTF importers differ; viewing follows the application theme |
 | Word wrap | ✓ | ✓ | Forced wrap at the window edge when enabled; shortcut ⌘\\ / Ctrl+\\ |
 | Syntax highlighting | ✓ | ✓ | Disabled for large documents |
 | Tabs and reopen closed tab | ✓ | ✓ | Platform-specific tab interfaces |

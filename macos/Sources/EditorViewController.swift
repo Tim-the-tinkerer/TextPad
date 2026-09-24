@@ -356,7 +356,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             delegate?.editorDidChange(self)
         }
 
-        if !document.isRichText {
+        if document.isRichText {
+            RichTextFormatting.refreshDisplayColors(EditorPreferences.shared.effectiveTheme, to: textView)
+        } else {
             if (textView.textStorage?.length ?? 0) <= LargeFileSupport.largeDocumentThreshold {
                 document.updateLineEndingIfNeeded(editedRange: editedRange, delta: delta, in: textView.string)
             }
@@ -388,6 +390,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
+        if document.isRichText {
+            RichTextFormatting.syncTypingAttributes(EditorPreferences.shared.effectiveTheme, to: textView)
+        }
         updateStatusBar()
         refreshCurrentLineHighlight()
         delegate?.editorSelectionDidChange(self)
