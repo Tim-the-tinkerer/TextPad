@@ -168,8 +168,8 @@ public static class RichTextMarkdown
 
     private static void CollectInline(Inline inline, string? link, List<Piece> pieces)
     {
-        var nextLink = inline is Hyperlink hyperlink
-            ? hyperlink.NavigateUri?.ToString() ?? ""
+        var nextLink = inline is Hyperlink linkElement
+            ? linkElement.NavigateUri?.ToString() ?? ""
             : link;
         switch (inline)
         {
