@@ -25,9 +25,7 @@ public sealed class EditorTab : IDisposable
     public DocumentTabHeader TabHeader { get; }
     public CurrentLineHighlighter? LineHighlighter { get; private set; }
     public InvisibleCharacterRenderer? InvisibleRenderer { get; private set; }
-    private SimplePlainTextEditor? _simpleEditor;
     private ContextMenu? _contextMenu;
-    private EventHandler? _simpleSelectionChangedHandler;
     private readonly FileChangeMonitor _fileMonitor = new();
     private bool _suppressDirty;
     private Grid? _previewGrid;
@@ -41,7 +39,6 @@ public sealed class EditorTab : IDisposable
 
     public bool IsDisposed { get; private set; }
     public bool IsMarkdownPreviewVisible { get; private set; }
-    public bool UsesSimpleEditor => _simpleEditor is not null;
 
     public bool IsMarkdownLanguage
     {
@@ -115,15 +112,6 @@ public sealed class EditorTab : IDisposable
 
     private async Task PopulatePlainContent(PlainTextOpenPayload payload, bool async)
     {
-        if (payload.UseSimpleEditor)
-        {
-            if (async)
-                await PopulateSimpleEditorAsync(payload);
-            else
-                PopulateSimpleEditorSync(payload);
-            return;
-        }
-
         _suppressDirty = true;
         try
         {
@@ -152,51 +140,6 @@ public sealed class EditorTab : IDisposable
         editor.CaretOffset = 0;
         payload.TextDocument.UndoStack.ClearAll();
         payload.TextDocument.UndoStack.MarkAsOriginalFile();
-    }
-
-    private async Task PopulateSimpleEditorAsync(PlainTextOpenPayload payload)
-    {
-        SetupSimpleEditorShell();
-        await View.Dispatcher.InvokeAsync(static () => { }, System.Windows.Threading.DispatcherPriority.Render);
-        SetSimpleEditorText(payload.SimpleEditorText ?? string.Empty);
-        StartFileMonitoring();
-    }
-
-    private void PopulateSimpleEditorSync(PlainTextOpenPayload payload)
-    {
-        SetupSimpleEditorShell();
-        SetSimpleEditorText(payload.SimpleEditorText ?? string.Empty);
-        StartFileMonitoring();
-    }
-
-    private void SetupSimpleEditorShell()
-    {
-        PlainEditor!.Visibility = Visibility.Collapsed;
-
-        _simpleEditor = new SimplePlainTextEditor();
-        var theme = EditorPreferences.Instance.EffectiveTheme;
-        var prefs = EditorPreferences.Instance;
-        _simpleEditor.ShowLineNumbers = prefs.ShowLineNumbers;
-        _simpleEditor.ApplyTheme(theme.Background, theme.Text, theme.LineNumberText, prefs.FontSize, theme.Selection);
-        _simpleEditor.TextChanged += OnSimpleTextChanged;
-        _simpleSelectionChangedHandler = (_, _) => CaretMoved?.Invoke(this, EventArgs.Empty);
-        _simpleEditor.SelectionChanged += _simpleSelectionChangedHandler;
-
-        PlaceEditorSurface(_simpleEditor.Host);
-        ApplyContextMenu();
-    }
-
-    private void SetSimpleEditorText(string text)
-    {
-        _suppressDirty = true;
-        try
-        {
-            _simpleEditor!.Text = text;
-        }
-        finally
-        {
-            _suppressDirty = false;
-        }
     }
 
     private void FinishPlainContentSetup(PlainTextOpenPayload payload)
@@ -285,8 +228,6 @@ public sealed class EditorTab : IDisposable
         {
             if (IsRichText)
                 return RichTextHelper.GetPlainText(RichEditor!);
-            if (_simpleEditor is not null)
-                return _simpleEditor.Text;
             return PlainEditor!.Document.Text;
         }
     }
@@ -297,8 +238,6 @@ public sealed class EditorTab : IDisposable
         {
             if (IsRichText)
                 return RichTextHelper.GetCharacterCount(RichEditor!);
-            if (_simpleEditor is not null)
-                return _simpleEditor.TextLength;
             return PlainEditor!.Document.TextLength;
         }
     }
@@ -309,8 +248,6 @@ public sealed class EditorTab : IDisposable
         {
             if (IsRichText)
                 return RichTextHelper.GetSelectedText(RichEditor!);
-            if (_simpleEditor is not null)
-                return _simpleEditor.SelectedText;
             return PlainEditor!.SelectedText;
         }
     }
@@ -321,8 +258,6 @@ public sealed class EditorTab : IDisposable
         {
             if (IsRichText)
                 return RichTextHelper.GetSelectionStart(RichEditor!);
-            if (_simpleEditor is not null)
-                return _simpleEditor.SelectionStart;
             return PlainEditor!.SelectionStart;
         }
     }
@@ -333,8 +268,6 @@ public sealed class EditorTab : IDisposable
         {
             if (IsRichText)
                 return RichTextHelper.GetLineCount(RichEditor!);
-            if (_simpleEditor is not null)
-                return _simpleEditor.LineCount;
             return PlainEditor!.LineCount;
         }
     }
@@ -352,8 +285,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichEditor!.Focus();
-        else if (_simpleEditor is not null)
-            _simpleEditor.Focus();
         else
             PlainEditor!.Focus();
     }
@@ -371,8 +302,6 @@ public sealed class EditorTab : IDisposable
 
         if (RichEditor is not null)
             RichEditor.ContextMenu = _contextMenu;
-        else if (_simpleEditor is not null)
-            _simpleEditor.SetContextMenu(_contextMenu);
         else if (PlainEditor is not null)
             PlainEditor.ContextMenu = _contextMenu;
     }
@@ -380,35 +309,30 @@ public sealed class EditorTab : IDisposable
     public void Undo()
     {
         if (IsRichText) RichEditor!.Undo();
-        else if (_simpleEditor is not null) _simpleEditor.Undo();
         else PlainEditor!.Undo();
     }
 
     public void Redo()
     {
         if (IsRichText) RichEditor!.Redo();
-        else if (_simpleEditor is not null) _simpleEditor.Redo();
         else PlainEditor!.Redo();
     }
 
     public void Cut()
     {
         if (IsRichText) RichEditor!.Cut();
-        else if (_simpleEditor is not null) _simpleEditor.Cut();
         else PlainEditor!.Cut();
     }
 
     public void Copy()
     {
         if (IsRichText) RichEditor!.Copy();
-        else if (_simpleEditor is not null) _simpleEditor.Copy();
         else PlainEditor!.Copy();
     }
 
     public void Paste()
     {
         if (IsRichText) RichEditor!.Paste();
-        else if (_simpleEditor is not null) _simpleEditor.Paste();
         else PlainEditor!.Paste();
     }
 
@@ -416,8 +340,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichTextCommands.PasteAndMatchStyle(RichEditor!);
-        else if (_simpleEditor is not null && Clipboard.ContainsText())
-            _simpleEditor.ReplaceText(_simpleEditor.SelectionStart, _simpleEditor.SelectedText.Length, Clipboard.GetText());
         else if (Clipboard.ContainsText() && PlainEditor is not null)
         {
             var segment = PlainEditor.TextArea.Selection.SurroundingSegment;
@@ -429,8 +351,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichEditor!.SelectAll();
-        else if (_simpleEditor is not null)
-            _simpleEditor.SelectAll();
         else
             PlainEditor!.SelectAll();
     }
@@ -469,8 +389,6 @@ public sealed class EditorTab : IDisposable
                     throw new InvalidDataException($"Unable to read RTF content: {ex.Message}", ex);
                 }
             }
-            else if (_simpleEditor is not null)
-                SetSimpleEditorText(Document.PlainContent ?? string.Empty);
             else if (PlainEditor is not null)
                 LargeFileSupport.LoadPlainText(PlainEditor, Document.PlainContent ?? string.Empty);
         }
@@ -492,8 +410,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichTextHelper.SelectRange(RichEditor!, start, length);
-        else if (_simpleEditor is not null)
-            _simpleEditor.Select(start, length);
         else
         {
             PlainEditor!.Select(start, length);
@@ -505,8 +421,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichTextHelper.ReplaceRange(RichEditor!, start, length, replacement);
-        else if (_simpleEditor is not null)
-            _simpleEditor.ReplaceText(start, length, replacement);
         else
             PlainEditor!.Document.Replace(start, length, replacement);
     }
@@ -515,8 +429,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             RichTextHelper.GoToLine(RichEditor!, line);
-        else if (_simpleEditor is not null)
-            _simpleEditor.GoToLine(line);
         else
         {
             PlainEditor!.ScrollToLine(line);
@@ -529,8 +441,6 @@ public sealed class EditorTab : IDisposable
     {
         if (IsRichText)
             return RichTextHelper.GetCaretPosition(RichEditor!);
-        if (_simpleEditor is not null)
-            return _simpleEditor.GetCaretPosition();
 
         var caret = PlainEditor!.TextArea.Caret;
         return (caret.Line, caret.Column);
@@ -559,15 +469,6 @@ public sealed class EditorTab : IDisposable
             return;
         }
 
-        if (_simpleEditor is not null)
-        {
-            var theme = prefs.EffectiveTheme;
-            _simpleEditor.ShowLineNumbers = prefs.ShowLineNumbers;
-            _simpleEditor.ApplyTheme(theme.Background, theme.Text, theme.LineNumberText, prefs.FontSize, theme.Selection);
-            RefreshMarkdownPreviewIfVisible();
-            return;
-        }
-
         PlainEditor!.ShowLineNumbers = LargeFileSupport.ShouldShowLineNumbers(
             PlainEditor.Document.TextLength,
             LargeFileSupport.CountLogicalLines(PlainEditor.Document.Text));
@@ -582,7 +483,7 @@ public sealed class EditorTab : IDisposable
 
     public void ApplySyntaxHighlighting()
     {
-        if (IsRichText || PlainEditor is null || UsesSimpleEditor)
+        if (IsRichText || PlainEditor is null)
             return;
 
         if (PlainEditor.Text.Length > LargeFileSupport.LargeDocumentCharacterThreshold)
@@ -599,7 +500,7 @@ public sealed class EditorTab : IDisposable
 
     public void UpdateCurrentLineHighlight()
     {
-        if (IsRichText || UsesSimpleEditor || LineHighlighter is null || PlainEditor is null)
+        if (IsRichText || LineHighlighter is null || PlainEditor is null)
             return;
 
         if (!EditorPreferences.Instance.HighlightCurrentLine)
@@ -647,17 +548,6 @@ public sealed class EditorTab : IDisposable
         if (IsRichText && RichEditor is not null)
         {
             RichTextHelper.ApplyTheme(RichEditor, theme);
-            return;
-        }
-
-        if (_simpleEditor is not null)
-        {
-            _simpleEditor.ApplyTheme(
-                theme.Background,
-                theme.Text,
-                theme.LineNumberText,
-                EditorPreferences.Instance.FontSize,
-                theme.Selection);
             return;
         }
 
@@ -724,12 +614,13 @@ public sealed class EditorTab : IDisposable
 
     private void OnPlainTextChanged(object? sender, EventArgs e)
     {
-        MarkDirty();
-        ScheduleMarkdownPreview();
-    }
+        if (!_suppressDirty
+            && PlainEditor is not null
+            && PlainEditor.Document.TextLength <= LargeFileSupport.LargeDocumentCharacterThreshold)
+        {
+            Document.LineEnding = EditorDocument.DetectLineEndings(PlainEditor.Document.Text);
+        }
 
-    private void OnSimpleTextChanged(object? sender, TextChangedEventArgs e)
-    {
         MarkDirty();
         ScheduleMarkdownPreview();
     }
@@ -815,27 +706,6 @@ public sealed class EditorTab : IDisposable
         View = _previewGrid;
         if (TabItem is not null)
             TabItem.Content = _previewGrid;
-    }
-
-    private void PlaceEditorSurface(FrameworkElement surface)
-    {
-        if (_previewGrid is null)
-        {
-            View = surface;
-            if (TabItem is not null)
-                TabItem.Content = View;
-            return;
-        }
-
-        var previous = _previewGrid.Children
-            .OfType<UIElement>()
-            .FirstOrDefault(child => Grid.GetColumn(child) == 0);
-        if (previous is not null)
-            _previewGrid.Children.Remove(previous);
-
-        Grid.SetColumn(surface, 0);
-        surface.MinWidth = 160;
-        _previewGrid.Children.Add(surface);
     }
 
     private static void DetachFromParent(FrameworkElement element)
@@ -1006,16 +876,6 @@ public sealed class EditorTab : IDisposable
         {
             RichEditor.TextChanged -= OnRichTextChanged;
             RichEditor.SelectionChanged -= OnRichSelectionChanged;
-        }
-        if (_simpleEditor is not null)
-        {
-            _simpleEditor.TextChanged -= OnSimpleTextChanged;
-            if (_simpleSelectionChangedHandler is not null)
-                _simpleEditor.SelectionChanged -= _simpleSelectionChangedHandler;
-            _simpleEditor.Text = string.Empty;
-            _simpleEditor.Dispose();
-            _simpleEditor = null;
-            _simpleSelectionChangedHandler = null;
         }
     }
 }

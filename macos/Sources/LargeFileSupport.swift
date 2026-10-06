@@ -66,7 +66,11 @@ enum LargeFileSupport {
     /// Rich text keeps the document's own paragraph wrapping.
     static func applyForcedWrap(to textView: NSTextView, wordWrap: Bool) {
         guard !textView.isRichText else { return }
-        let mode: NSLineBreakMode = wordWrap ? .byCharWrapping : .byClipping
+        let isLarge = (textView.textStorage?.length ?? 0) > largeDocumentThreshold
+        // A large document is inserted with character wrapping. The container
+        // width decides whether that style wraps, so preferences must not
+        // stamp a new paragraph style across the whole storage.
+        let mode: NSLineBreakMode = (wordWrap || isLarge) ? .byCharWrapping : .byClipping
         let paragraph: NSMutableParagraphStyle
         if let existing = (textView.defaultParagraphStyle ?? textView.typingAttributes[.paragraphStyle] as? NSParagraphStyle)?
             .mutableCopy() as? NSMutableParagraphStyle
@@ -82,7 +86,7 @@ enum LargeFileSupport {
         typing[.paragraphStyle] = paragraph
         textView.typingAttributes = typing
 
-        if let storage = textView.textStorage, storage.length > 0 {
+        if let storage = textView.textStorage, storage.length > 0, !isLarge {
             storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length))
         }
     }

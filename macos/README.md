@@ -2,7 +2,7 @@
 
 The native macOS edition of TextPad is implemented in Swift and AppKit.
 
-**Current version:** 1.5.12  
+**Current version:** 1.5.13  
 **Minimum system:** macOS 11  
 **Source:** `Sources/`  
 **Application resources:** `Resources/`
@@ -27,7 +27,7 @@ bash run.sh
 bash installer/build-installer.sh
 ```
 
-Outputs are written to `dist/` as a DMG and PKG named for the platform version and architecture. Set `REBUILD=1` to rebuild the app first, `DMG_LAYOUT=1` for Finder-based DMG layout, or `SIGN_IDENTITY` for release signing.
+Outputs are written to `dist/` as a DMG and PKG named for the platform version and architecture. Set `REBUILD=1` to rebuild the app first, or `DMG_LAYOUT=1` for Finder-based DMG layout. Sign the application with `APP_SIGN_IDENTITY` (Developer ID Application). Sign the PKG with `INSTALLER_SIGN_IDENTITY` (Developer ID Installer). `SIGN_IDENTITY` still signs only the application.
 
 ## Versioning
 

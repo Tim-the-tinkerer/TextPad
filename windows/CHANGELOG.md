@@ -1,5 +1,15 @@
 # TextPad (Windows) Changelog
 
+## 1.5.13 — 2026-10-05
+
+### Fixed
+- `.rtfd` packages are rejected on open and on save. A rich-text file can only be saved as `.rtf`.
+- A file larger than 256 MB is rejected from its size on disk before it is read.
+- The status-bar line ending and Return follow the text after an edit, for documents within the large-document limit.
+
+### Removed
+- The unused simple text editor. Plain text uses the main editor.
+
 ## 1.5.12 — 2026-10-05
 
 ### Fixed

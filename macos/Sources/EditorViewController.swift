@@ -206,9 +206,22 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
                 NSAttributedString(string: document.content, attributes: attrs)
             )
         } else {
-            textView.font = EditorPreferences.shared.font
-            textView.textColor = theme.text
-            textView.string = document.content
+            let font = EditorPreferences.shared.font
+            let length = (document.content as NSString).length
+            if length > LargeFileSupport.largeDocumentThreshold {
+                let attributes = PlainTextEditing.largeDocumentAttributes(
+                    font: font,
+                    textColor: theme.text,
+                    tabWidth: EditorPreferences.shared.tabWidth
+                )
+                textView.textStorage?.setAttributedString(
+                    NSAttributedString(string: document.content, attributes: attributes)
+                )
+            } else {
+                textView.font = font
+                textView.textColor = theme.text
+                textView.string = document.content
+            }
         }
 
         textView.backgroundColor = theme.background
@@ -252,10 +265,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
         let prefs = EditorPreferences.shared
         let theme = prefs.effectiveTheme
-        let wordWrap = override ?? LargeFileSupport.effectiveWordWrap(
-            preferred: prefs.wordWrap,
-            text: textView.string
-        )
+        let wordWrap = override ?? prefs.wordWrap
         let isLargeDocument = (textView.textStorage?.length ?? 0) > LargeFileSupport.largeDocumentThreshold
         inWindowFindBar.applyTheme(theme)
 
@@ -268,16 +278,31 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         if document.isRichText {
             RichTextFormatting.applyTheme(theme, to: textView)
         } else {
-            textView.font = prefs.font
-            textView.textColor = theme.text
-            textView.typingAttributes = [
-                .font: prefs.font,
-                .foregroundColor: theme.text
-            ]
             textView.selectedTextAttributes = [
                 .backgroundColor: theme.selection,
                 .foregroundColor: theme.text
             ]
+            if isLargeDocument {
+                var typing = textView.typingAttributes
+                typing[.font] = prefs.font
+                typing[.foregroundColor] = theme.text
+                textView.typingAttributes = typing
+                // Assigning font or textColor rewrites every character. Do that
+                // only when the open document is not already showing them.
+                if !PlainTextEditing.storageUses(font: prefs.font, in: textView) {
+                    textView.font = prefs.font
+                }
+                if !PlainTextEditing.storageUses(color: theme.text, in: textView) {
+                    textView.textColor = theme.text
+                }
+            } else {
+                textView.font = prefs.font
+                textView.textColor = theme.text
+                textView.typingAttributes = [
+                    .font: prefs.font,
+                    .foregroundColor: theme.text
+                ]
+            }
             PlainTextEditing.applyTabWidth(to: textView, font: prefs.font, tabWidth: prefs.tabWidth, wordWrap: wordWrap)
             PlainTextEditing.configureInvisibles(on: textView, show: prefs.showInvisibles && !isLargeDocument)
 

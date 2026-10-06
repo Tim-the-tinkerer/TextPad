@@ -1,11 +1,11 @@
 import AppKit
 
 enum DocumentExport {
-    static func htmlData(fromPlainText text: String, title: String) -> Data? {
+    static func htmlData(fromPlainText text: String, title: String, preserveUTF8BOM: Bool = false) -> Data? {
         // A pasted web page is the document. Write it through so a browser
         // runs it, instead of showing the source inside a <pre> page.
         if isStandaloneHTMLDocument(text) {
-            return text.data(using: .utf8)
+            return utf8Data(text, preserveBOM: preserveUTF8BOM)
         }
 
         let normalized = text
@@ -18,11 +18,20 @@ enum DocumentExport {
 
     /// Renders Markdown to a browser page. An HTML document pasted into a
     /// Markdown buffer is still written through unchanged.
-    static func htmlData(fromMarkdown text: String, title: String) -> Data? {
+    static func htmlData(fromMarkdown text: String, title: String, preserveUTF8BOM: Bool = false) -> Data? {
         if isStandaloneHTMLDocument(text) {
-            return text.data(using: .utf8)
+            return utf8Data(text, preserveBOM: preserveUTF8BOM)
         }
         return Markdown.htmlDocument(from: text, title: title).data(using: .utf8)
+    }
+
+    /// Pass-through keeps a UTF-8 BOM the open file had. Generated pages do not gain one.
+    private static func utf8Data(_ text: String, preserveBOM: Bool) -> Data? {
+        guard let data = text.data(using: .utf8) else { return nil }
+        guard preserveBOM, !text.hasPrefix("\u{FEFF}") else { return data }
+        var marked = Data([0xEF, 0xBB, 0xBF])
+        marked.append(data)
+        return marked
     }
 
     /// True when the text is itself an HTML document: optional BOM, whitespace,

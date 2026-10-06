@@ -1029,12 +1029,7 @@ public partial class MainWindow : Window
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Undo_Click(object sender, RoutedEventArgs e) => ActiveTab?.Undo();
-    private void Redo_Click(object sender, RoutedEventArgs e)
-    {
-        if (ActiveTab is { UsesSimpleEditor: true })
-            return;
-        ActiveTab?.Redo();
-    }
+    private void Redo_Click(object sender, RoutedEventArgs e) => ActiveTab?.Redo();
     private void Cut_Click(object sender, RoutedEventArgs e)
     {
         if (TryEditFocusedTextInput(static editor => editor.Cut()))
@@ -1779,7 +1774,7 @@ public partial class MainWindow : Window
             return informational.Split('+')[0];
 
         var version = asm.GetName().Version;
-        return version is null ? "1.5.12" : $"{version.Major}.{version.Minor}.{version.Build}";
+        return version is null ? "1.5.13" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     private ContextMenu CreateEditorContextMenu()
@@ -1838,7 +1833,7 @@ public partial class MainWindow : Window
         {
             var enabled = item.Tag switch
             {
-                "redo" => tab is not null && !tab.UsesSimpleEditor,
+                "redo" => tab is not null,
                 "cut" or "copy" => tab is not null && tab.SelectedText.Length > 0,
                 "paste" or "pasteMatchStyle" => Clipboard.ContainsText(),
                 "selectAll" => tab is not null && tab.TextLength > 0,

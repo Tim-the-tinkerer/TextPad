@@ -5,7 +5,11 @@ Platform release histories live with their applications:
 - [`macos/CHANGELOG.md`](macos/CHANGELOG.md)
 - [`windows/CHANGELOG.md`](windows/CHANGELOG.md)
 
-Current source version on both editions: **1.5.12**.
+Current source version on both editions: **1.5.13**.
+
+## 1.5.13 — 2026-10-05
+
+- Large plain-text documents on macOS no longer receive a full-document paragraph update when they open. A file over 256 MB is rejected from its size on disk. `.rtfd` is rejected on Windows. See the platform changelogs.
 
 ## 1.5.12 — 2026-10-05
 

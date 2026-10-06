@@ -9,25 +9,60 @@ enum PlainTextEditing {
         "'": "'"
     ]
 
-    static func applyTabWidth(to textView: NSTextView, font: NSFont, tabWidth: Int, wordWrap: Bool) {
+    static func paragraphStyle(font: NSFont, tabWidth: Int, lineBreakMode: NSLineBreakMode) -> NSMutableParagraphStyle {
         let charWidth = (" " as NSString).size(withAttributes: [.font: font]).width
-        let interval = charWidth * CGFloat(max(1, tabWidth))
-
         let paragraph = NSMutableParagraphStyle()
-        paragraph.defaultTabInterval = interval
+        paragraph.defaultTabInterval = charWidth * CGFloat(max(1, tabWidth))
         paragraph.tabStops = []
-        paragraph.lineBreakMode = wordWrap ? .byCharWrapping : .byClipping
+        paragraph.lineBreakMode = lineBreakMode
+        return paragraph
+    }
 
-        textView.font = font
+    /// One attribute run for a large plain-text document. Wrap stays
+    /// `.byCharWrapping` so the text container width, not a later full-document
+    /// attribute write, turns wrapping on and off.
+    static func largeDocumentAttributes(font: NSFont, textColor: NSColor, tabWidth: Int) -> [NSAttributedString.Key: Any] {
+        [
+            .font: font,
+            .foregroundColor: textColor,
+            .paragraphStyle: paragraphStyle(font: font, tabWidth: tabWidth, lineBreakMode: .byCharWrapping)
+        ]
+    }
+
+    static func storageUses(font: NSFont, in textView: NSTextView) -> Bool {
+        storageAttribute(.font, equals: font, in: textView)
+    }
+
+    static func storageUses(color: NSColor, in textView: NSTextView) -> Bool {
+        storageAttribute(.foregroundColor, equals: color, in: textView)
+    }
+
+    static func applyTabWidth(to textView: NSTextView, font: NSFont, tabWidth: Int, wordWrap: Bool) {
+        let isLarge = (textView.textStorage?.length ?? 0) > LargeFileSupport.largeDocumentThreshold
+        // Large documents keep the paragraph style from insertion. Rewriting it
+        // walks the whole file whenever preferences are applied.
+        let mode: NSLineBreakMode = (wordWrap || isLarge) ? .byCharWrapping : .byClipping
+        let paragraph = paragraphStyle(font: font, tabWidth: tabWidth, lineBreakMode: mode)
+
+        if !isLarge {
+            textView.font = font
+        }
         textView.defaultParagraphStyle = paragraph
         var typing = textView.typingAttributes
         typing[.font] = font
         typing[.paragraphStyle] = paragraph
         textView.typingAttributes = typing
 
-        if let storage = textView.textStorage, storage.length > 0 {
+        if let storage = textView.textStorage, storage.length > 0, !isLarge {
             storage.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: storage.length))
         }
+    }
+
+    private static func storageAttribute(_ key: NSAttributedString.Key, equals expected: NSObject, in textView: NSTextView) -> Bool {
+        guard let storage = textView.textStorage, storage.length > 0 else { return true }
+        var range = NSRange()
+        let value = storage.attribute(key, at: 0, effectiveRange: &range) as? NSObject
+        return range.length == storage.length && value == expected
     }
 
     static func configureInvisibles(on textView: NSTextView, show: Bool) {

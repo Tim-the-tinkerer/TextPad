@@ -27,7 +27,7 @@ The two TextPad editions do not share source code, but they should agree on thes
 - Plain text that is already an HTML document exports unchanged. The document may begin with a BOM, whitespace, HTML comments, or an XML declaration, and then `<!DOCTYPE html` or `<html`. A browser then runs that page instead of showing the source.
 - A later mention of those tags, or a fragment that starts with another element, still exports as escaped text.
 - Rich text still exports as formatted HTML on a white page. Line endings inside a passed-through HTML document are left as the editor holds them.
-- macOS writes the export as UTF-8 and does not add a BOM. A BOM already in the document is kept. Windows writes every HTML export as UTF-8 with a BOM.
+- macOS writes the export as UTF-8 and does not add a BOM. When an HTML page is written through unchanged, a UTF-8 BOM already recorded for that document is kept. Windows writes every HTML export as UTF-8 with a BOM.
 - When the syntax language is Markdown and the document is plain text, Export as HTML renders the note. Headings, lists, links, tables, fenced code, strikethrough, and task lists are included. Markup typed in the note is escaped and shown as text. Links may use http, https, mailto, a fragment, or a relative address. A document that is already an HTML page is still written through unchanged, before any Markdown rendering. The rendered page uses a light background. Windows still adds a UTF-8 BOM around that page.
 
 ## Markdown export
@@ -51,9 +51,11 @@ The two TextPad editions do not share source code, but they should agree on thes
 
 ## Large documents
 
-- Files up to 256 MB may be opened, subject to available memory.
+- Files up to 256 MB may be opened, subject to available memory. The limit is read from the file size on disk before the file is read.
 - Syntax coloring, Markdown preview, and visual embellishments may be disabled above the large-document threshold.
 - Opening should not force complete document layout before the first viewport appears.
+- Opening a large plain-text document, or applying preferences to it, must not rewrite paragraph style across the whole text. Word wrap still follows the user setting.
+- The displayed line ending is recalculated after an edit when the document is within the large-document threshold. A larger document keeps the ending detected when it was opened. Return uses that ending.
 - Large documents should not produce autosave snapshots above the snapshot limit.
 - Word wrap still follows the user setting on large documents.
 

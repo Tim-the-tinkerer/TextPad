@@ -85,6 +85,28 @@ public sealed class EditorDocument
 
     public static EditorDocument LoadFromFile(string path, Encoding? explicitEncoding = null)
     {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        if (extension == ".rtfd" || Directory.Exists(path))
+            throw new InvalidDataException("RTFD packages are not supported. Open or export the document as a standard .rtf file.");
+
+        if (File.Exists(path))
+        {
+            long length = -1;
+            try
+            {
+                length = new FileInfo(path).Length;
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            if (length > MaxLoadBytes)
+                throw new InvalidDataException($"File is too large to open ({length / (1024 * 1024)} MB). Maximum is {MaxLoadBytes / (1024 * 1024)} MB.");
+        }
+
         var bytes = SafeFileReader.ReadAllBytes(path);
         if (bytes.Length > MaxLoadBytes)
             throw new InvalidDataException($"File is too large to open ({bytes.Length / (1024 * 1024)} MB). Maximum is {MaxLoadBytes / (1024 * 1024)} MB.");

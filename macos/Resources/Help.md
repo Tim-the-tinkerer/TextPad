@@ -2,7 +2,7 @@
 
 TextPad is a lightweight text editor for macOS. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
-**Version 1.5.12**
+**Version 1.5.13**
 
 ---
 

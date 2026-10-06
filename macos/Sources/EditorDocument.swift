@@ -51,16 +51,18 @@ final class EditorDocument: NSObject {
     static let maxLoadBytes = 256 * 1024 * 1024
 
     func load(from url: URL, encoding explicitEncoding: String.Encoding? = nil) throws {
-        if url.pathExtension.lowercased() == "rtfd" || url.hasDirectoryPath {
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+        if url.pathExtension.lowercased() == "rtfd" || url.hasDirectoryPath || values?.isDirectory == true {
             throw NSError(domain: "TextPad", code: 8, userInfo: [
                 NSLocalizedDescriptionKey: "RTFD packages are not supported. Open or export the document as a standard .rtf file."
             ])
         }
+        if let size = values?.fileSize, size > Self.maxLoadBytes {
+            throw Self.fileTooLarge(size)
+        }
         let data = try SafeFileReader.readData(from: url)
         guard data.count <= Self.maxLoadBytes else {
-            throw NSError(domain: "TextPad", code: 7, userInfo: [
-                NSLocalizedDescriptionKey: "File is too large to open (\(data.count / (1024 * 1024)) MB). Maximum is \(Self.maxLoadBytes / (1024 * 1024)) MB."
-            ])
+            throw Self.fileTooLarge(data.count)
         }
         fileURL = url
         format = DocumentFormat.detect(from: url)
@@ -176,15 +178,26 @@ final class EditorDocument: NSObject {
         self.lineEndingPolicy = lineEndingPolicy
     }
 
+    private static func fileTooLarge(_ bytes: Int) -> NSError {
+        NSError(domain: "TextPad", code: 7, userInfo: [
+            NSLocalizedDescriptionKey: "File is too large to open (\(bytes / (1024 * 1024)) MB). Maximum is \(maxLoadBytes / (1024 * 1024)) MB."
+        ])
+    }
+
     private func validateSaveTarget(_ url: URL) throws {
         let ext = url.pathExtension.lowercased()
+        if ext == "rtfd" {
+            throw NSError(domain: "TextPad", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "RTFD packages are not supported. Open or export the document as a standard .rtf file."
+            ])
+        }
         if isRichText {
             guard ext == "rtf" else {
                 throw NSError(domain: "TextPad", code: 4, userInfo: [
                     NSLocalizedDescriptionKey: "Rich text documents must be saved with a .rtf extension."
                 ])
             }
-        } else if ext == "rtf" || ext == "rtfd" {
+        } else if ext == "rtf" {
             throw NSError(domain: "TextPad", code: 4, userInfo: [
                 NSLocalizedDescriptionKey: "Plain text cannot be saved with a rich text (.rtf) extension."
             ])

@@ -9,7 +9,15 @@ APP_PATH="$ROOT/$APP_NAME.app"
 DIST_DIR="$ROOT/dist"
 PKG_WORK="$ROOT/installer/pkg-work"
 DMG_WORK="$ROOT/installer/dmg-work"
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+# The application and the PKG use different certificates.
+# APP_SIGN_IDENTITY: Developer ID Application. SIGN_IDENTITY is the older name
+# for that application identity only. It is not passed to pkgbuild.
+# INSTALLER_SIGN_IDENTITY: Developer ID Installer. Empty leaves the PKG unsigned.
+APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-${SIGN_IDENTITY:--}}"
+INSTALLER_SIGN_IDENTITY="${INSTALLER_SIGN_IDENTITY:-}"
+if [ "$INSTALLER_SIGN_IDENTITY" = "-" ]; then
+  INSTALLER_SIGN_IDENTITY=""
+fi
 BUNDLE_ID="com.textpad.editor"
 
 echo "TextPad macOS installer build"
@@ -18,7 +26,7 @@ echo "=============================="
 # Build the app if missing or if REBUILD=1
 if [ ! -d "$APP_PATH" ] || [ "${REBUILD:-0}" = "1" ]; then
   echo "Building $APP_NAME.app..."
-  bash build.sh
+  APP_SIGN_IDENTITY="$APP_SIGN_IDENTITY" SIGN_IDENTITY="$APP_SIGN_IDENTITY" bash build.sh
 fi
 
 if [ ! -d "$APP_PATH" ]; then
@@ -123,8 +131,8 @@ PKG_ARGS=(
   --version "$VERSION"
   --scripts "$ROOT/installer/scripts"
 )
-if [ "$SIGN_IDENTITY" != "-" ]; then
-  PKG_ARGS+=(--sign "$SIGN_IDENTITY")
+if [ -n "$INSTALLER_SIGN_IDENTITY" ]; then
+  PKG_ARGS+=(--sign "$INSTALLER_SIGN_IDENTITY")
 fi
 
 pkgbuild "${PKG_ARGS[@]}" "$PKG_WORK/TextPad-component.pkg"
@@ -134,8 +142,8 @@ PRODUCT_ARGS=(
   --package-path "$PKG_WORK"
   --version "$VERSION"
 )
-if [ "$SIGN_IDENTITY" != "-" ]; then
-  PRODUCT_ARGS+=(--sign "$SIGN_IDENTITY")
+if [ -n "$INSTALLER_SIGN_IDENTITY" ]; then
+  PRODUCT_ARGS+=(--sign "$INSTALLER_SIGN_IDENTITY")
 fi
 
 productbuild "${PRODUCT_ARGS[@]}" "$PKG_PATH"
@@ -203,12 +211,16 @@ APPLESCRIPT
 fi
 
 # Optional notarization hint
-if [ "$SIGN_IDENTITY" = "-" ]; then
+if [ -z "$INSTALLER_SIGN_IDENTITY" ]; then
   echo ""
-  echo "Installers are unsigned (local use)."
-  echo "For distribution, rebuild with a Developer ID certificate:"
-  echo "  SIGN_IDENTITY=\"Developer ID Application: Your Name (TEAMID)\" bash installer/build-installer.sh"
+  echo "The PKG is unsigned."
+  echo "Sign the application with a Developer ID Application identity."
+  echo "pkgbuild and productbuild need a separate Developer ID Installer identity."
+  echo "  APP_SIGN_IDENTITY=\"Developer ID Application: Your Name (TEAMID)\" \\"
+  echo "  INSTALLER_SIGN_IDENTITY=\"Developer ID Installer: Your Name (TEAMID)\" \\"
+  echo "  REBUILD=1 bash installer/build-installer.sh"
   echo ""
+  echo "SIGN_IDENTITY still signs only the application. It is not passed to the PKG."
   echo "Users may need to right-click → Open the first time, or approve in System Settings."
 fi
 

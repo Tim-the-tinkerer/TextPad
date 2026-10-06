@@ -4,8 +4,8 @@ TextPad is a lightweight text editor for macOS and Windows. The two editions sha
 
 | Platform | Current version | Implementation | Project |
 |---|---:|---|---|
-| macOS | 1.5.12 | Swift and AppKit | [`macos/`](macos/) |
-| Windows | 1.5.12 | C#, WPF and .NET 8 | [`windows/`](windows/) |
+| macOS | 1.5.13 | Swift and AppKit | [`macos/`](macos/) |
+| Windows | 1.5.13 | C#, WPF and .NET 8 | [`windows/`](windows/) |
 
 ## Repository layout
 
@@ -59,8 +59,8 @@ See the platform README for requirements, installer commands and output location
 
 Use independent tags and GitHub releases:
 
-- `macos-v1.5.12`
-- `windows-v1.5.12`
+- `macos-v1.5.13`
+- `windows-v1.5.13`
 
 Each release should contain only that platform's binaries. See [`docs/releasing.md`](docs/releasing.md).
 

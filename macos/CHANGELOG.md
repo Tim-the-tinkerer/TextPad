@@ -1,5 +1,17 @@
 # TextPad (macOS) Changelog
 
+## 1.5.13 — 2026-10-05
+
+### Fixed
+- Opening a large plain-text file, or applying preferences to it, no longer rewrites paragraph style across the whole document. Word wrap still follows the window.
+- A file larger than 256 MB is rejected from its size on disk before it is read.
+- If a file keeps changing while it is read, TextPad reports that it could not obtain a stable copy.
+- Export as HTML keeps a UTF-8 byte-order mark that the open document already had when the page is written through unchanged. Other HTML exports still omit a BOM.
+- Saving to `.rtfd` is rejected with the same message as opening an RTFD package.
+
+### Changed
+- Release signing uses `APP_SIGN_IDENTITY` for the application and `INSTALLER_SIGN_IDENTITY` for the PKG.
+
 ## 1.5.12 — 2026-10-05
 
 ### Fixed

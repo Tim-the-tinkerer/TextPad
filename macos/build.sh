@@ -117,9 +117,12 @@ fi
 chmod a+rX "$APP_DIR/Contents/Resources"
 
 # Code signing
-# Set SIGN_IDENTITY to a keychain identity (e.g. "Developer ID Application: Your Name (TEAMID)")
-# to produce a distributable signature. Defaults to ad-hoc ("-") for local use.
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+# APP_SIGN_IDENTITY is a Developer ID Application certificate.
+# SIGN_IDENTITY is the older name for that same application identity.
+# The PKG installer uses INSTALLER_SIGN_IDENTITY and is not signed here.
+# Defaults to ad-hoc ("-") for local use.
+APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-${SIGN_IDENTITY:--}}"
+SIGN_IDENTITY="$APP_SIGN_IDENTITY"
 ENTITLEMENTS="$RESOURCE_DIR/TextPad.entitlements"
 
 echo "Signing $APP_DIR with identity: $SIGN_IDENTITY"
@@ -140,7 +143,7 @@ echo "Run with: open $APP_DIR"
 if [ "$SIGN_IDENTITY" = "-" ]; then
   echo ""
   echo "Signed ad-hoc (local only). For distribution, install a Developer ID"
-  echo "certificate and rebuild with:"
-  echo "  SIGN_IDENTITY=\"Developer ID Application: ...\" ./build.sh"
+  echo "Application certificate and rebuild with:"
+  echo "  APP_SIGN_IDENTITY=\"Developer ID Application: ...\" ./build.sh"
 fi
 echo ""

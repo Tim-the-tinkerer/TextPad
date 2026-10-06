@@ -700,14 +700,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         let title = editor.document.fileURL?.deletingPathExtension().lastPathComponent ?? "Document"
+        let preserveUTF8BOM = editor.document.writesByteOrderMark && editor.document.encoding == .utf8
         do {
             let data: Data
             if editor.document.isRichText {
                 data = try RichTextFormatting.htmlData(from: editor.activeTextView)
             } else if editor.document.language == .markdown,
-                      let markdownData = DocumentExport.htmlData(fromMarkdown: editor.document.content, title: title) {
+                      let markdownData = DocumentExport.htmlData(
+                        fromMarkdown: editor.document.content,
+                        title: title,
+                        preserveUTF8BOM: preserveUTF8BOM
+                      ) {
                 data = markdownData
-            } else if let plainData = DocumentExport.htmlData(fromPlainText: editor.document.content, title: title) {
+            } else if let plainData = DocumentExport.htmlData(
+                fromPlainText: editor.document.content,
+                title: title,
+                preserveUTF8BOM: preserveUTF8BOM
+            ) {
                 data = plainData
             } else {
                 throw NSError(domain: "TextPad", code: 5, userInfo: [
@@ -827,7 +836,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.12"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.13"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "TextPad",
             .applicationVersion: version,

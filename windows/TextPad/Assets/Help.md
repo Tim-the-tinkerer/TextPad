@@ -2,7 +2,7 @@
 
 TextPad is a lightweight **64-bit** text editor for Windows. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
-**Version 1.5.12**
+**Version 1.5.13**
 
 ---
 
