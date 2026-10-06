@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 protocol EditorViewControllerDelegate: AnyObject {
     func editorDidChange(_ controller: EditorViewController)
@@ -29,6 +30,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var isPromptingForExternalChange = false
     private var hasLoadedDocumentIntoView = false
     private var isApplyingPresentation = false
+    private var previewWebView: WKWebView?
+    private var previewDivider: NSView?
+    private(set) var isMarkdownPreviewVisible = false
+    private var previewTimer: Timer?
 
     init(document: EditorDocument) {
         self.document = document
@@ -38,6 +43,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        previewTimer?.invalidate()
         fileChangeMonitor.stop()
         autoSaveManager.stop()
     }
@@ -157,15 +163,23 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let editorHeight = h - editorBottom
         let showGutter = EditorPreferences.shared.showLineNumbers &&
             (textView.textStorage?.length ?? 0) <= LargeFileSupport.largeDocumentThreshold
+        let previewWidth = isMarkdownPreviewVisible ? min(max(220, floor(w * 0.42)), max(0, w - 160)) : 0
+        let editorWidth = w - previewWidth
 
         if showGutter, let gutter = lineNumberGutter {
             gutter.frame = NSRect(x: 0, y: editorBottom, width: LineNumberGutterView.width, height: editorHeight)
             gutter.isHidden = false
-            scrollView.frame = NSRect(x: LineNumberGutterView.width, y: editorBottom, width: w - LineNumberGutterView.width, height: editorHeight)
+            scrollView.frame = NSRect(x: LineNumberGutterView.width, y: editorBottom, width: editorWidth - LineNumberGutterView.width, height: editorHeight)
         } else {
             lineNumberGutter?.isHidden = true
-            scrollView.frame = NSRect(x: 0, y: editorBottom, width: w, height: editorHeight)
+            scrollView.frame = NSRect(x: 0, y: editorBottom, width: editorWidth, height: editorHeight)
         }
+
+        previewDivider?.frame = NSRect(x: editorWidth - 1, y: editorBottom, width: 1, height: editorHeight)
+        previewDivider?.layer?.backgroundColor = EditorPreferences.shared.effectiveTheme.lineNumberText.cgColor
+        previewDivider?.isHidden = !isMarkdownPreviewVisible
+        previewWebView?.frame = NSRect(x: editorWidth, y: editorBottom, width: previewWidth, height: editorHeight)
+        previewWebView?.isHidden = !isMarkdownPreviewVisible
 
         if textView.textContainer?.widthTracksTextView == true, let container = textView.textContainer {
             let width = scrollView.contentSize.width
@@ -315,6 +329,108 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             label.textColor = theme.chromeText
         }
         updateStatusBar()
+        if isMarkdownPreviewVisible {
+            refreshMarkdownPreview()
+        }
+    }
+
+    func toggleMarkdownPreview() {
+        isMarkdownPreviewVisible.toggle()
+        if isMarkdownPreviewVisible {
+            installMarkdownPreview()
+            refreshMarkdownPreview()
+        } else {
+            previewTimer?.invalidate()
+            previewTimer = nil
+            previewWebView?.isHidden = true
+            previewDivider?.isHidden = true
+        }
+        layoutEditorSubviews()
+    }
+
+    private func installMarkdownPreview() {
+        if previewDivider == nil {
+            let divider = NSView()
+            divider.wantsLayer = true
+            view.addSubview(divider)
+            previewDivider = divider
+        }
+        if previewWebView == nil {
+            let web = WKWebView(frame: .zero)
+            view.addSubview(web)
+            previewWebView = web
+        }
+        let theme = EditorPreferences.shared.effectiveTheme
+        previewDivider?.layer?.backgroundColor = theme.lineNumberText.cgColor
+        previewWebView?.isHidden = false
+        previewDivider?.isHidden = false
+    }
+
+    private func scheduleMarkdownPreview() {
+        guard isMarkdownPreviewVisible else { return }
+        previewTimer?.invalidate()
+        previewTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
+            self?.refreshMarkdownPreview()
+        }
+    }
+
+    private func refreshMarkdownPreview() {
+        guard isMarkdownPreviewVisible, let web = previewWebView else { return }
+        let title = document.fileURL?.deletingPathExtension().lastPathComponent ?? "Preview"
+        let style = markdownPageStyle(for: EditorPreferences.shared.effectiveTheme)
+        let source = textView.string
+        let html: String
+        if (source as NSString).length > LargeFileSupport.largeDocumentThreshold {
+            html = Markdown.htmlDocument(
+                from: "Preview is not available for a document this large.",
+                title: title,
+                style: style
+            )
+        } else {
+            html = Markdown.htmlDocument(from: source, title: title, style: style)
+        }
+        let base = document.fileURL?.deletingLastPathComponent()
+        web.loadHTMLString(html, baseURL: base)
+    }
+
+    private func markdownPageStyle(for theme: EditorTheme) -> Markdown.PageStyle {
+        let resolved = theme == .system ? EditorTheme.systemResolved : theme
+        func hex(_ color: NSColor) -> String {
+            let rgb = color.usingColorSpace(.sRGB) ?? color
+            let red = Int((rgb.redComponent * 255).rounded())
+            let green = Int((rgb.greenComponent * 255).rounded())
+            let blue = Int((rgb.blueComponent * 255).rounded())
+            return String(format: "#%02X%02X%02X", red, green, blue)
+        }
+        let codeBackground: String
+        let accent: String
+        let border: String
+        switch resolved {
+        case .dark:
+            codeBackground = "#2A2A30"
+            accent = "#8AB4FF"
+            border = "#3A3A42"
+        case .solarized:
+            codeBackground = "#073642"
+            accent = "#2AA198"
+            border = "#586E75"
+        case .sepia:
+            codeBackground = "#EFE6D6"
+            accent = "#8A5A12"
+            border = "#D9CDB8"
+        default:
+            codeBackground = "#F3F4F6"
+            accent = "#0B57D0"
+            border = "#E4E4EA"
+        }
+        return Markdown.PageStyle(
+            background: hex(resolved.background),
+            foreground: hex(resolved.text),
+            muted: hex(resolved.lineNumberText),
+            codeBackground: codeBackground,
+            accent: accent,
+            border: border
+        )
     }
 
     func updateStatusBar() {
@@ -368,25 +484,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         updateStatusBar()
         lineNumberGutter?.needsDisplay = true
         refreshCurrentLineHighlight()
+        scheduleMarkdownPreview()
     }
 
     private static func lineNumber(at location: Int, in text: NSString) -> Int {
-        guard location > 0 else { return 1 }
-        var line = 1
-        var index = 0
-        while index < location {
-            let codeUnit = text.character(at: index)
-            if codeUnit == 0x0A {
-                line += 1
-            } else if codeUnit == 0x0D {
-                let next = index + 1
-                if next >= location || text.character(at: next) != 0x0A {
-                    line += 1
-                }
-            }
-            index += 1
-        }
-        return line
+        LineEnding.lineNumber(at: location, in: text)
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
@@ -426,7 +528,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             return true
         }
         if commandSelector == #selector(NSStandardKeyBindingResponding.insertNewline(_:)) {
-            PlainTextEditing.insertNewlineWithAutoIndent(in: textView)
+            PlainTextEditing.insertNewlineWithAutoIndent(in: textView, lineEnding: document.lineEnding)
             return true
         }
         return false
@@ -483,7 +585,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         inWindowFindBar.applyTheme(EditorPreferences.shared.effectiveTheme)
         let selection = textView.selectedRange()
         let selected = (textView.string as NSString).substring(with: selection)
-        let seed = selection.length > 0 && !selected.contains("\n") ? selected : inWindowFindBar.query
+        let seed = selection.length > 0 && !TextSearch.containsLineBreak(selected) ? selected : inWindowFindBar.query
         inWindowFindBar.prepare(with: seed)
         layoutEditorSubviews()
     }

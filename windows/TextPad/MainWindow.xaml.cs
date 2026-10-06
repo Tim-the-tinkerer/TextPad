@@ -94,6 +94,7 @@ public partial class MainWindow : Window
         BindShortcut(Key.Subtract, ModifierKeys.Control, () => ZoomOut_Click(this, new RoutedEventArgs()));
         BindShortcut(Key.Oem5, ModifierKeys.Control, ToggleWordWrap);
         BindShortcut(Key.OemBackslash, ModifierKeys.Control, ToggleWordWrap);
+        BindShortcut(Key.M, ModifierKeys.Control | ModifierKeys.Shift, ToggleMarkdownPreview);
         BindShortcut(Key.F1, ModifierKeys.None, OpenHelp);
 
         for (var i = 0; i < 9; i++)
@@ -723,6 +724,7 @@ public partial class MainWindow : Window
         LineNumbersItem.IsChecked = prefs.ShowLineNumbers;
         InvisiblesItem.IsChecked = prefs.ShowInvisibles;
         CurrentLineItem.IsChecked = prefs.HighlightCurrentLine;
+        MarkdownPreviewItem.IsChecked = ActiveTab?.IsMarkdownPreviewVisible == true;
     }
 
     private TextSearchOptions GetActiveSearchOptions()
@@ -1397,7 +1399,55 @@ public partial class MainWindow : Window
         var exportName = string.IsNullOrEmpty(tab.Document.FilePath)
             ? "Untitled"
             : Path.GetFileNameWithoutExtension(tab.Document.FilePath);
-        DocumentExport.ExportHtml(this, tab.RichEditor, exportName, tab.Text);
+        DocumentExport.ExportHtml(this, tab.RichEditor, exportName, tab.Text, tab.IsMarkdownLanguage);
+    }
+
+    private void ExportMarkdown_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = ActiveTab;
+        if (tab is null)
+            return;
+
+        var exportName = string.IsNullOrEmpty(tab.Document.FilePath)
+            ? "Untitled"
+            : Path.GetFileNameWithoutExtension(tab.Document.FilePath);
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Markdown (*.md)|*.md|All files (*.*)|*.*",
+            FileName = exportName + ".md"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            byte[] bytes;
+            if (tab.IsRichText && tab.RichEditor is not null)
+            {
+                var markdown = RichTextMarkdown.Export(tab.RichEditor.Document);
+                bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(markdown);
+            }
+            else
+            {
+                var markdown = tab.IsMarkdownLanguage
+                    ? tab.Text
+                    : PlainTextMarkdown.ApplySourceLineEndings(PlainTextMarkdown.ToMarkdown(tab.Text), tab.Text);
+                try
+                {
+                    bytes = tab.Document.BuildBytesForSave(markdown);
+                }
+                catch (InvalidDataException) when (markdown.Contains('\u00A0'))
+                {
+                    bytes = tab.Document.BuildBytesForSave(markdown.Replace('\u00A0', ' '));
+                }
+            }
+
+            AtomicFileWriter.WriteAllBytes(dialog.FileName, bytes);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(this, ex.Message, "Could not export", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void PasteMatchStyle_Click(object sender, RoutedEventArgs e) => ActiveTab?.PasteMatchStyle();
@@ -1412,6 +1462,14 @@ public partial class MainWindow : Window
 
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => ActiveTab?.Zoom(1);
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => ActiveTab?.Zoom(-1);
+
+    private void MarkdownPreview_Click(object sender, RoutedEventArgs e) => ToggleMarkdownPreview();
+
+    private void ToggleMarkdownPreview()
+    {
+        ActiveTab?.ToggleMarkdownPreview();
+        MarkdownPreviewItem.IsChecked = ActiveTab?.IsMarkdownPreviewVisible == true;
+    }
 
     private void Invisibles_Click(object sender, RoutedEventArgs e)
     {
@@ -1707,7 +1765,7 @@ public partial class MainWindow : Window
     {
         System.Windows.MessageBox.Show(
             this,
-            $"TextPad {GetAppVersionString()}\nA lightweight 64-bit text editor for Windows.\nInspired by BBEdit and CotEditor.",
+            $"TextPad {GetAppVersionString()}\nA lightweight 64-bit text editor for Windows.",
             "About TextPad",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -1721,7 +1779,7 @@ public partial class MainWindow : Window
             return informational.Split('+')[0];
 
         var version = asm.GetName().Version;
-        return version is null ? "1.5.6" : $"{version.Major}.{version.Minor}.{version.Build}";
+        return version is null ? "1.5.12" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     private ContextMenu CreateEditorContextMenu()
@@ -1851,6 +1909,7 @@ public partial class MainWindow : Window
     {
         if (ActiveTab is not null)
             ActiveTab.UpdateCurrentLineHighlight();
+        MarkdownPreviewItem.IsChecked = ActiveTab?.IsMarkdownPreviewVisible == true;
         RefreshTabBar();
         UpdateStatusBar();
     }

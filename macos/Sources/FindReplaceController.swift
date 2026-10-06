@@ -100,7 +100,7 @@ final class FindReplaceController: NSWindowController {
         let sel = textView.selectedRange()
         if sel.length > 0 {
             let selected = (textView.string as NSString).substring(with: sel)
-            if !selected.contains("\n") {
+            if !TextSearch.containsLineBreak(selected) {
                 findField.stringValue = selected
             }
         }
@@ -121,11 +121,12 @@ final class FindReplaceController: NSWindowController {
         guard !searchText.isEmpty else { return nil }
 
         let content = textView.string as NSString
+        guard content.length > 0 else { return nil }
         let start: Int
         if forward {
-            start = textView.selectedRange().location + textView.selectedRange().length
+            start = min(textView.selectedRange().location + textView.selectedRange().length, content.length)
         } else {
-            start = max(0, textView.selectedRange().location - 1)
+            start = min(max(0, textView.selectedRange().location - 1), content.length - 1)
         }
 
         if regexCheckbox.state == .on {
@@ -185,7 +186,7 @@ final class FindReplaceController: NSWindowController {
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
         textView.showFindIndicator(for: range)
-        statusLabel.stringValue = "Found at line \((textView.string as NSString).substring(to: range.location).components(separatedBy: "\n").count)"
+        statusLabel.stringValue = "Found at line \(LineEnding.lineNumber(at: range.location, in: textView.string as NSString))"
     }
 
     @objc func findNext() {

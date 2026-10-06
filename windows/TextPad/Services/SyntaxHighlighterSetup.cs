@@ -68,7 +68,7 @@ public static class SyntaxHighlighterSetup
             ".cpp" or ".cc" or ".cxx" or ".h" or ".hpp" or ".c" or ".m" or ".mm" or ".swift" => SyntaxLanguage.Cpp,
             ".sql" => SyntaxLanguage.Sql,
             ".ps1" => SyntaxLanguage.PowerShell,
-            ".md" or ".markdown" => SyntaxLanguage.Markdown,
+            ".md" or ".markdown" or ".mdown" => SyntaxLanguage.Markdown,
             ".sh" or ".bash" or ".zsh" => SyntaxLanguage.Shell,
             _ => SyntaxLanguage.PlainText
         };

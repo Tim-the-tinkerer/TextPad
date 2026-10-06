@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Editing;
 using ICSharpCode.AvalonEdit.Rendering;
@@ -29,9 +30,29 @@ public sealed class EditorTab : IDisposable
     private EventHandler? _simpleSelectionChangedHandler;
     private readonly FileChangeMonitor _fileMonitor = new();
     private bool _suppressDirty;
+    private Grid? _previewGrid;
+    private WebBrowser? _previewBrowser;
+    private GridSplitter? _previewSplitter;
+    private ColumnDefinition? _editorColumn;
+    private ColumnDefinition? _splitterColumn;
+    private ColumnDefinition? _previewColumn;
+    private DispatcherTimer? _previewTimer;
+    private string? _pendingPreviewHtml;
 
     public bool IsDisposed { get; private set; }
+    public bool IsMarkdownPreviewVisible { get; private set; }
     public bool UsesSimpleEditor => _simpleEditor is not null;
+
+    public bool IsMarkdownLanguage
+    {
+        get
+        {
+            var language = Document.SyntaxLanguage;
+            if (language == SyntaxLanguage.Auto)
+                language = SyntaxHighlighterSetup.DetectFromPath(Document.FilePath);
+            return language == SyntaxLanguage.Markdown;
+        }
+    }
 
     public event EventHandler? ContentChanged;
     public event EventHandler? CaretMoved;
@@ -161,8 +182,7 @@ public sealed class EditorTab : IDisposable
         _simpleSelectionChangedHandler = (_, _) => CaretMoved?.Invoke(this, EventArgs.Empty);
         _simpleEditor.SelectionChanged += _simpleSelectionChangedHandler;
 
-        View = _simpleEditor.Host;
-        TabItem.Content = View;
+        PlaceEditorSurface(_simpleEditor.Host);
         ApplyContextMenu();
     }
 
@@ -464,6 +484,8 @@ public sealed class EditorTab : IDisposable
         RefreshTabTitle();
         ApplySyntaxHighlighting();
         StartFileMonitoring();
+        if (IsMarkdownPreviewVisible)
+            RefreshMarkdownPreview();
     }
 
     public void Select(int start, int length)
@@ -532,6 +554,8 @@ public sealed class EditorTab : IDisposable
             {
                 _suppressDirty = false;
             }
+
+            RefreshMarkdownPreviewIfVisible();
             return;
         }
 
@@ -540,6 +564,7 @@ public sealed class EditorTab : IDisposable
             var theme = prefs.EffectiveTheme;
             _simpleEditor.ShowLineNumbers = prefs.ShowLineNumbers;
             _simpleEditor.ApplyTheme(theme.Background, theme.Text, theme.LineNumberText, prefs.FontSize, theme.Selection);
+            RefreshMarkdownPreviewIfVisible();
             return;
         }
 
@@ -552,6 +577,7 @@ public sealed class EditorTab : IDisposable
         PlainEditor.Options.IndentationSize = prefs.TabWidth;
         ApplyTheme();
         ApplySyntaxHighlighting();
+        RefreshMarkdownPreviewIfVisible();
     }
 
     public void ApplySyntaxHighlighting()
@@ -696,9 +722,23 @@ public sealed class EditorTab : IDisposable
         ContentChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnPlainTextChanged(object? sender, EventArgs e) => MarkDirty();
-    private void OnSimpleTextChanged(object? sender, TextChangedEventArgs e) => MarkDirty();
-    private void OnRichTextChanged(object? sender, TextChangedEventArgs e) => MarkDirty();
+    private void OnPlainTextChanged(object? sender, EventArgs e)
+    {
+        MarkDirty();
+        ScheduleMarkdownPreview();
+    }
+
+    private void OnSimpleTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        MarkDirty();
+        ScheduleMarkdownPreview();
+    }
+
+    private void OnRichTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        MarkDirty();
+        ScheduleMarkdownPreview();
+    }
     private void OnCaretMoved(object? sender, EventArgs e) => CaretMoved?.Invoke(this, EventArgs.Empty);
     private void OnRichSelectionChanged(object? sender, RoutedEventArgs e) => CaretMoved?.Invoke(this, EventArgs.Empty);
 
@@ -726,12 +766,230 @@ public sealed class EditorTab : IDisposable
             e.Handled = true;
     }
 
+    public void ToggleMarkdownPreview()
+    {
+        IsMarkdownPreviewVisible = !IsMarkdownPreviewVisible;
+        EnsurePreviewSplit();
+        ApplyPreviewVisibility();
+        if (IsMarkdownPreviewVisible)
+            RefreshMarkdownPreview();
+        else
+            _previewTimer?.Stop();
+
+        View.Dispatcher.BeginInvoke(Focus, DispatcherPriority.Input);
+    }
+
+    private void EnsurePreviewSplit()
+    {
+        if (_previewGrid is not null)
+            return;
+
+        var editor = View;
+        DetachFromParent(editor);
+
+        var theme = EditorPreferences.Instance.EffectiveTheme;
+        _editorColumn = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+        _splitterColumn = new ColumnDefinition { Width = new GridLength(0) };
+        _previewColumn = new ColumnDefinition { Width = new GridLength(0) };
+        _previewSplitter = new GridSplitter
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Background = new SolidColorBrush(theme.LineNumberText),
+            Visibility = Visibility.Collapsed
+        };
+        _previewBrowser = new WebBrowser { Visibility = Visibility.Collapsed };
+        editor.MinWidth = 160;
+        Grid.SetColumn(editor, 0);
+        Grid.SetColumn(_previewSplitter, 1);
+        Grid.SetColumn(_previewBrowser, 2);
+
+        _previewGrid = new Grid();
+        _previewGrid.ColumnDefinitions.Add(_editorColumn);
+        _previewGrid.ColumnDefinitions.Add(_splitterColumn);
+        _previewGrid.ColumnDefinitions.Add(_previewColumn);
+        _previewGrid.Children.Add(editor);
+        _previewGrid.Children.Add(_previewSplitter);
+        _previewGrid.Children.Add(_previewBrowser);
+
+        View = _previewGrid;
+        if (TabItem is not null)
+            TabItem.Content = _previewGrid;
+    }
+
+    private void PlaceEditorSurface(FrameworkElement surface)
+    {
+        if (_previewGrid is null)
+        {
+            View = surface;
+            if (TabItem is not null)
+                TabItem.Content = View;
+            return;
+        }
+
+        var previous = _previewGrid.Children
+            .OfType<UIElement>()
+            .FirstOrDefault(child => Grid.GetColumn(child) == 0);
+        if (previous is not null)
+            _previewGrid.Children.Remove(previous);
+
+        Grid.SetColumn(surface, 0);
+        surface.MinWidth = 160;
+        _previewGrid.Children.Add(surface);
+    }
+
+    private static void DetachFromParent(FrameworkElement element)
+    {
+        switch (element.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(element);
+                break;
+            case ContentControl control when ReferenceEquals(control.Content, element):
+                control.Content = null;
+                break;
+            case Decorator decorator when ReferenceEquals(decorator.Child, element):
+                decorator.Child = null;
+                break;
+        }
+    }
+
+    private void ApplyPreviewVisibility()
+    {
+        if (_editorColumn is null || _splitterColumn is null || _previewColumn is null ||
+            _previewSplitter is null || _previewBrowser is null)
+            return;
+
+        if (IsMarkdownPreviewVisible)
+        {
+            _editorColumn.Width = new GridLength(1.4, GridUnitType.Star);
+            _splitterColumn.Width = new GridLength(5);
+            _previewColumn.Width = new GridLength(1, GridUnitType.Star);
+            _previewSplitter.Visibility = Visibility.Visible;
+            _previewBrowser.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _editorColumn.Width = new GridLength(1, GridUnitType.Star);
+            _splitterColumn.Width = new GridLength(0);
+            _previewColumn.Width = new GridLength(0);
+            _previewSplitter.Visibility = Visibility.Collapsed;
+            _previewBrowser.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ScheduleMarkdownPreview()
+    {
+        if (!IsMarkdownPreviewVisible || _suppressDirty)
+            return;
+
+        _previewTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        _previewTimer.Stop();
+        _previewTimer.Tick -= OnPreviewTick;
+        _previewTimer.Tick += OnPreviewTick;
+        _previewTimer.Start();
+    }
+
+    private void OnPreviewTick(object? sender, EventArgs e)
+    {
+        _previewTimer?.Stop();
+        RefreshMarkdownPreview();
+    }
+
+    private void RefreshMarkdownPreviewIfVisible()
+    {
+        UpdatePreviewChrome();
+        if (IsMarkdownPreviewVisible)
+            RefreshMarkdownPreview();
+    }
+
+    private void UpdatePreviewChrome()
+    {
+        if (_previewSplitter is null)
+            return;
+
+        _previewSplitter.Background = new SolidColorBrush(EditorPreferences.Instance.EffectiveTheme.LineNumberText);
+    }
+
+    private void RefreshMarkdownPreview()
+    {
+        if (!IsMarkdownPreviewVisible || _previewBrowser is null)
+            return;
+
+        var title = string.IsNullOrEmpty(Document.FilePath)
+            ? "Preview"
+            : Path.GetFileNameWithoutExtension(Document.FilePath);
+        var style = PreviewPageStyle();
+        var source = Text;
+        var html = source.Length > LargeFileSupport.LargeDocumentCharacterThreshold
+            ? Markdown.HtmlDocument("Preview is not available for a document this large.", title, style)
+            : Markdown.HtmlDocument(source, title, style);
+        NavigatePreview(html);
+    }
+
+    private void NavigatePreview(string html)
+    {
+        if (_previewBrowser is null)
+            return;
+
+        if (!_previewBrowser.IsLoaded)
+        {
+            _pendingPreviewHtml = html;
+            _previewBrowser.Loaded -= OnPreviewBrowserLoaded;
+            _previewBrowser.Loaded += OnPreviewBrowserLoaded;
+            return;
+        }
+
+        try
+        {
+            _previewBrowser.NavigateToString(html);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            _pendingPreviewHtml = html;
+            _previewBrowser.Loaded -= OnPreviewBrowserLoaded;
+            _previewBrowser.Loaded += OnPreviewBrowserLoaded;
+        }
+    }
+
+    private void OnPreviewBrowserLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_previewBrowser is null || _pendingPreviewHtml is null)
+            return;
+
+        var html = _pendingPreviewHtml;
+        _pendingPreviewHtml = null;
+        _previewBrowser.NavigateToString(html);
+    }
+
+    private static Markdown.PageStyle PreviewPageStyle()
+    {
+        var theme = EditorPreferences.Instance.EffectiveTheme;
+        var (code, accent, border) = theme.Kind switch
+        {
+            EditorThemeKind.Dark => ("#2A2A30", "#8AB4FF", "#3A3A42"),
+            EditorThemeKind.Solarized => ("#073642", "#2AA198", "#586E75"),
+            EditorThemeKind.Sepia => ("#EFE6D6", "#8A5A12", "#D9CDB8"),
+            _ => ("#F3F4F6", "#0B57D0", "#E4E4EA")
+        };
+        return new Markdown.PageStyle(
+            Hex(theme.Background),
+            Hex(theme.Text),
+            Hex(theme.LineNumberText),
+            code,
+            accent,
+            border);
+    }
+
+    private static string Hex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
     public void Dispose()
     {
         if (IsDisposed)
             return;
 
         IsDisposed = true;
+        _previewTimer?.Stop();
         _fileMonitor.Dispose();
         if (PlainEditor is not null)
         {

@@ -57,6 +57,8 @@ swiftc \
   "$SOURCE_DIR/CrashLogger.swift" \
   "$SOURCE_DIR/SingleInstanceManager.swift" \
   "$SOURCE_DIR/DocumentExport.swift" \
+  "$SOURCE_DIR/Markdown.swift" \
+  "$SOURCE_DIR/MarkdownExport.swift" \
   "$SOURCE_DIR/LargeFileSupport.swift" \
   "$SOURCE_DIR/SafeFileReader.swift" \
   "$SOURCE_DIR/AppDelegate.swift" \
@@ -86,7 +88,8 @@ swiftc \
   -framework AppKit \
   -framework Foundation \
   -framework UniformTypeIdentifiers \
-  -framework CoreText
+  -framework CoreText \
+  -framework WebKit
 
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"

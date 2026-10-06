@@ -77,7 +77,7 @@ enum PlainTextEditing {
         textView.insertText("", replacementRange: NSRange(location: range.location - removeCount, length: removeCount))
     }
 
-    static func insertNewlineWithAutoIndent(in textView: NSTextView) {
+    static func insertNewlineWithAutoIndent(in textView: NSTextView, lineEnding: LineEnding) {
         let prefs = EditorPreferences.shared
         let range = textView.selectedRange()
         let text = textView.string as NSString
@@ -91,7 +91,7 @@ enum PlainTextEditing {
             extraIndent = String(repeating: " ", count: prefs.tabWidth)
         }
 
-        textView.insertText("\n" + indent + extraIndent, replacementRange: range)
+        textView.insertText(lineEnding.separator + indent + extraIndent, replacementRange: range)
     }
 
     static func shouldHandlePairing(_ replacement: String) -> Bool {

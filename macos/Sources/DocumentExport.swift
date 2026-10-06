@@ -2,12 +2,65 @@ import AppKit
 
 enum DocumentExport {
     static func htmlData(fromPlainText text: String, title: String) -> Data? {
+        // A pasted web page is the document. Write it through so a browser
+        // runs it, instead of showing the source inside a <pre> page.
+        if isStandaloneHTMLDocument(text) {
+            return text.data(using: .utf8)
+        }
+
         let normalized = text
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
         let body = "<pre>\(htmlEscape(normalized))</pre>"
         let html = wrapHTMLDocument(body: body, title: title)
         return html.data(using: .utf8)
+    }
+
+    /// Renders Markdown to a browser page. An HTML document pasted into a
+    /// Markdown buffer is still written through unchanged.
+    static func htmlData(fromMarkdown text: String, title: String) -> Data? {
+        if isStandaloneHTMLDocument(text) {
+            return text.data(using: .utf8)
+        }
+        return Markdown.htmlDocument(from: text, title: title).data(using: .utf8)
+    }
+
+    /// True when the text is itself an HTML document: optional BOM, whitespace,
+    /// comments, or an XML declaration, then `<!DOCTYPE html` or `<html`.
+    static func isStandaloneHTMLDocument(_ text: String) -> Bool {
+        var rest = Substring(text)
+        if rest.first == "\u{FEFF}" {
+            rest = rest.dropFirst()
+        }
+
+        while true {
+            rest = rest.drop(while: { $0.isWhitespace })
+            if rest.hasPrefix("<!--") {
+                guard let end = rest.range(of: "-->") else { return false }
+                rest = rest[end.upperBound...]
+                continue
+            }
+            if rest.hasPrefix("<?") {
+                guard let end = rest.range(of: "?>") else { return false }
+                rest = rest[end.upperBound...]
+                continue
+            }
+            break
+        }
+
+        if rest.prefix(9).lowercased() == "<!doctype" {
+            let afterName = rest.dropFirst(9).drop(while: { $0.isWhitespace })
+            guard afterName.prefix(4).lowercased() == "html" else { return false }
+            let following = afterName.dropFirst(4).first
+            return following == nil || following!.isWhitespace || following == ">"
+        }
+
+        if rest.prefix(5).lowercased() == "<html" {
+            let following = rest.dropFirst(5).first
+            return following == nil || following!.isWhitespace || following == ">"
+        }
+
+        return false
     }
 
     static func pdfData(fromPlainText text: String, fontSize: CGFloat) -> Data? {

@@ -2,7 +2,7 @@
 
 TextPad is a lightweight text editor for macOS. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
-**Version 1.5.6**
+**Version 1.5.12**
 
 ---
 
@@ -34,7 +34,8 @@ Only one TextPad instance runs at a time. Launching TextPad again (or opening fi
 | Document Encoding | — | Change encoding for the current plain-text document |
 | Print | ⌘P | Print the active document |
 | Export as PDF | — | Export plain or rich text to PDF |
-| Export as HTML | — | Export to a standalone HTML file |
+| Export as HTML | — | Write an HTML page through unchanged. A Markdown note is rendered. Other plain text becomes a simple page; rich text keeps formatting |
+| Export as Markdown | — | Write a `.md` file. Plain text becomes Markdown. Rich text becomes Markdown |
 
 ### Supported formats
 
@@ -47,7 +48,7 @@ Plain-text documents support UTF-8, UTF-8 with BOM, UTF-16 LE/BE, ASCII, and ISO
 
 ### Line endings
 
-The status bar shows **LF**, **CRLF**, **CR**, or **Mixed** for plain-text files. Set the default for new saves in **TextPad → Preferences → Line endings on save** (Preserve, LF, or CRLF).
+The status bar shows **LF**, **CRLF**, **CR**, or **Mixed** for plain-text files. Pressing Return inserts that ending. A mixed file inserts LF. Set the default for new saves in **TextPad → Preferences → Line endings on save** (Preserve, LF, or CRLF). A UTF-8 file that was opened with a byte-order mark is saved with that mark.
 
 ---
 
@@ -101,6 +102,7 @@ Available when the document is rich text (RTF):
 | Toggle Word Wrap | ⌘\\ | Wrap lines at the window edge, including long words |
 | Toggle Invisibles | ⌘⌥I | Display spaces, tabs, and line endings |
 | Toggle Current Line Highlight | — | Shade the line containing the caret |
+| Markdown Preview | ⌘⇧M | Render the Markdown note beside the editor |
 | Syntax Highlighting | — | Pick a language manually |
 
 Themes and other editor settings are in **TextPad → Preferences** (**⌘,**).
@@ -148,6 +150,7 @@ Preferences are stored in macOS **UserDefaults** under the `com.textpad.editor` 
 - Files over **256 MB** cannot be opened.
 - Word wrap, when enabled, is forced wrap: long lines and long words break at the window edge.
 - Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
+- Markdown preview is unavailable above that same size and shows a short notice instead.
 - The editor grows with content so large files scroll correctly.
 
 ---
@@ -174,7 +177,8 @@ If a file open in TextPad is modified on disk by another application, you are pr
 
 - **Print** — Sends the document to the system print dialog.
 - **Export as PDF** — Plain text is rendered to PDF; rich text keeps formatting where possible.
-- **Export as HTML** — Rich text exports as HTML; plain text as a simple HTML page.
+- **Export as Markdown** — Writes a `.md` file without changing the open document. Plain text becomes Markdown that shows the same words and line breaks. Characters Markdown would treat as formatting, headings, or lists are escaped, and the file keeps the document's encoding and line endings. Set the syntax language to Markdown when the note is already Markdown; TextPad then writes it as typed. Rich text becomes Markdown: bold, italic, strikethrough, lists, links, and tables. Underline is written as `<u>…</u>`. Font, color, and alignment are left out.
+- **Export as HTML** — Rich text exports as formatted HTML on a white page. A plain-text Markdown note is rendered: headings, lists, links, tables, and fenced code become a page, and tags typed in the note stay visible as text. Other plain text that is not an HTML page exports as a simple page: the text sits in a preformatted block, and `<`, `>`, `&`, and quotes are escaped. Plain text that is already an HTML page is written unchanged, so a browser runs it. That page may start with blank lines, comments, or an XML declaration, and then `<!DOCTYPE html>` or `<html>`. A note that only mentions those tags later, or a fragment that starts with another element such as `<div>`, still exports as escaped text. Saving the document is separate from this command. Use **Save** or **Save As** when you want the editor text written as a file. The rendered page uses a light background. Preview, under View → Markdown Preview, follows the editor theme.
 
 ---
 
@@ -244,6 +248,7 @@ Paths with spaces should be quoted. Additional launches forward files to the run
 ### View
 - ⌘+ / ⌘- — Zoom in / out
 - ⌘\\ — Toggle word wrap
+- ⌘⇧M — Markdown preview
 - ⌘⇧L — Toggle line numbers
 - ⌘⌥I — Toggle invisibles
 
@@ -273,6 +278,9 @@ Email receipts and similar RTF files often use light gray or near-black body tex
 **Selection is hard to see**  
 TextPad uses distinct colors for text selection and the current-line highlight. You can turn off the current-line highlight in View → Toggle Current Line Highlight or in Preferences.
 
+**A pasted web page shows up as source code in the browser**  
+**Export as HTML** used to wrap that source in another page. Export it again from plain text. The document needs to start with `<!DOCTYPE html>` or `<html>` (blank lines and comments before that are fine). A rich-text document still exports as formatted HTML, not as the original source.
+
 **Gatekeeper warning**  
 If the app is unsigned or ad-hoc signed, macOS may warn on first open. Open via **System Settings → Privacy & Security** or right-click → Open.
 
@@ -283,6 +291,6 @@ Check `~/Library/Application Support/com.textpad.editor/crash.log` for details a
 
 ## About
 
-TextPad is inspired by BBEdit and CotEditor. See **TextPad → About TextPad** for the installed version number.
+See **TextPad → About TextPad** for the installed version number.
 
 © TextPad

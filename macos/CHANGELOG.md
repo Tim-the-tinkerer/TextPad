@@ -1,5 +1,49 @@
 # TextPad (macOS) Changelog
 
+## 1.5.12 — 2026-10-05
+
+### Fixed
+- Saving a UTF-8 file keeps its byte-order mark.
+- CRLF and CR files are recognized. Return inserts that ending, line numbers count those breaks, and a selection that crosses a line is not placed in Find.
+- Find Previous on an empty document no longer stops the search.
+- Export as Markdown keeps CRLF or CR when the line-ending policy is Preserve.
+- An address with two @ signs is not turned into a link in Markdown preview or HTML export.
+
+## 1.5.11 — 2026-10-05
+
+### Changed
+- **Export as Markdown** converts plain text into Markdown that shows the same words and line breaks. Characters Markdown would treat as formatting are escaped. A note whose syntax language is already Markdown is written as typed.
+
+## 1.5.10 — 2026-10-05
+
+### Added
+- **Export as Markdown** writes a `.md` file. Plain text is copied with the document's encoding and line endings. Rich text becomes Markdown: bold, italic, strikethrough, underline, lists, links, and tables.
+
+### Changed
+- **Export as HTML** renders Markdown only when the syntax language is Markdown.
+
+## 1.5.9 — 2026-10-05
+
+### Changed
+- **Export as HTML** renders plain text that is Markdown, including a note that is not saved as `.md`. A lone bullet list stays preformatted text. Code files stay preformatted text.
+
+## 1.5.8 — 2026-10-05
+
+### Added
+- **Markdown Preview** (⌘⇧M) shows the rendered note beside the editor. It follows the editor theme and stays off until you open it. Documents over 500,000 characters show a short notice.
+- `.md`, `.markdown`, and `.mdown` are recognized as Markdown. Highlighting covers headings, emphasis, links, quotes, lists, and code.
+
+### Changed
+- **Export as HTML** renders a plain-text Markdown note. A document that is already an HTML page is still written through unchanged.
+
+## 1.5.7 — 2026-10-05
+
+### Fixed
+- **Export as HTML** writes a plain-text document through unchanged when it is already an HTML page (`<!DOCTYPE html>` or `<html>`, after optional blank lines, comments, or an XML declaration). Browsers run that page instead of showing the source inside `<pre>`. Notes and fragments still export as escaped text.
+
+### Changed
+- The About box and help no longer name other editors. Help describes when an HTML export is written through and when it stays escaped text.
+
 ## 1.5.6 — 2026-09-13
 
 ### Added

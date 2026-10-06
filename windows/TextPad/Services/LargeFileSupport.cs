@@ -15,20 +15,20 @@ public static class LargeFileSupport
     public static bool HasExtremelyLongLines(string text)
     {
         var current = 0;
-        foreach (var ch in text)
+        for (var i = 0; i < text.Length; i++)
         {
-            if (ch == '\n')
+            if (IsLineBreak(text, i, out var width))
             {
+                if (current > LongLineThreshold)
+                    return true;
                 current = 0;
+                i += width - 1;
                 continue;
             }
 
-            if (ch != '\r')
-            {
-                current++;
-                if (current > LongLineThreshold)
-                    return true;
-            }
+            current++;
+            if (current > LongLineThreshold)
+                return true;
         }
 
         return current > LongLineThreshold;
@@ -41,21 +41,39 @@ public static class LargeFileSupport
 
         var maxLength = 0;
         var current = 0;
-        foreach (var ch in text)
+        for (var i = 0; i < text.Length; i++)
         {
-            if (ch == '\n')
+            if (IsLineBreak(text, i, out var width))
             {
                 if (current > maxLength)
                     maxLength = current;
                 current = 0;
+                i += width - 1;
+                continue;
             }
-            else if (ch != '\r')
-            {
-                current++;
-            }
+
+            current++;
         }
 
         return Math.Max(maxLength, current);
+    }
+
+    private static bool IsLineBreak(string text, int index, out int width)
+    {
+        if (text[index] == '\r')
+        {
+            width = index + 1 < text.Length && text[index + 1] == '\n' ? 2 : 1;
+            return true;
+        }
+
+        if (text[index] == '\n')
+        {
+            width = 1;
+            return true;
+        }
+
+        width = 1;
+        return false;
     }
 
     public static bool EffectiveWordWrap(bool preferred, string text)
@@ -132,10 +150,12 @@ public static class LargeFileSupport
             return 1;
 
         var count = 1;
-        foreach (var ch in text)
+        for (var i = 0; i < text.Length; i++)
         {
-            if (ch == '\n')
-                count++;
+            if (!IsLineBreak(text, i, out var width))
+                continue;
+            count++;
+            i += width - 1;
         }
 
         return count;

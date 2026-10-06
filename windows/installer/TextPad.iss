@@ -1,6 +1,6 @@
 ; TextPad Windows installer (Inno Setup 6) — 64-bit only
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.6"
+  #define MyAppVersion "1.5.12"
 #endif
 #ifndef MyAppSource
   #define MyAppSource "..\dist\x64-installer"
@@ -56,6 +56,8 @@ Root: HKCR; Subkey: "TextPad.Document\shell\open\command"; ValueType: string; Va
 Root: HKCR; Subkey: ".txt\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKCR; Subkey: ".rtf\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKCR; Subkey: ".md\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKCR; Subkey: ".markdown\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKCR; Subkey: ".mdown\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKCR; Subkey: ".json\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKCR; Subkey: ".xml\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKCR; Subkey: ".csv\OpenWithProgids"; ValueType: string; ValueName: "TextPad.Document"; ValueData: ""; Flags: uninsdeletevalue; Tasks: fileassoc

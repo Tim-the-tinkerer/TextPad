@@ -7,6 +7,12 @@ struct TextSearchOptions {
 }
 
 enum TextSearch {
+    /// True when the selection crosses a line. Swift folds CR+LF into one Character,
+    /// so a check for `"\n"` misses a CRLF break.
+    static func containsLineBreak(_ text: String) -> Bool {
+        (text as NSString).rangeOfCharacter(from: .newlines).location != NSNotFound
+    }
+
     static func find(
         _ searchText: String,
         in content: NSString,
@@ -14,7 +20,7 @@ enum TextSearch {
         forward: Bool,
         options: TextSearchOptions
     ) -> NSRange? {
-        guard !searchText.isEmpty else { return nil }
+        guard !searchText.isEmpty, content.length > 0 else { return nil }
 
         let start: Int
         if forward {

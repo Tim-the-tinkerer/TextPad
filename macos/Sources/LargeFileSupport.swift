@@ -13,10 +13,13 @@ enum LargeFileSupport {
         var maxLength = 0
         var current = 0
         for character in text {
-            if character == "\n" {
+            // CR+LF is one Character, so compare its scalars instead of "\n" or "\r".
+            let scalars = character.unicodeScalars
+            let isCRLF = scalars.count == 2 && scalars.first?.value == 13 && scalars.dropFirst().first?.value == 10
+            if isCRLF || character == "\n" || character == "\r" {
                 maxLength = max(maxLength, current)
                 current = 0
-            } else if character != "\r" {
+            } else {
                 current += 1
             }
         }

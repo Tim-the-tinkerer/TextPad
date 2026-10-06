@@ -9,6 +9,7 @@ The two TextPad editions do not share source code, but they should agree on thes
 - Preserve whether an opened UTF-8 or UTF-16 file used a BOM.
 - Reject unrepresentable characters when saving to ASCII or a legacy encoding; never silently replace them with `?`.
 - Preserve existing line endings unless the user explicitly selects LF or CRLF conversion.
+- Pressing Return inserts the document's current line ending. LF, CRLF, and CR each stay themselves. A mixed document inserts LF.
 - Offer an explicit **Open with Encoding** path when automatic detection is wrong.
 
 ## Rich text
@@ -20,6 +21,28 @@ The two TextPad editions do not share source code, but they should agree on thes
 - Theme presentation must not replace stored RTF colors on save unless the user has edited the document. macOS uses display-only attributes; Windows writes the original bytes for an unedited file.
 - Any readability repair that changes an attributed run should be documented because it can affect saved RTF after an edit.
 
+## HTML export
+
+- Plain text that is not an HTML document exports as a standalone page with the text inside `<pre>`, with `<`, `>`, `&`, and `"` escaped.
+- Plain text that is already an HTML document exports unchanged. The document may begin with a BOM, whitespace, HTML comments, or an XML declaration, and then `<!DOCTYPE html` or `<html`. A browser then runs that page instead of showing the source.
+- A later mention of those tags, or a fragment that starts with another element, still exports as escaped text.
+- Rich text still exports as formatted HTML on a white page. Line endings inside a passed-through HTML document are left as the editor holds them.
+- macOS writes the export as UTF-8 and does not add a BOM. A BOM already in the document is kept. Windows writes every HTML export as UTF-8 with a BOM.
+- When the syntax language is Markdown and the document is plain text, Export as HTML renders the note. Headings, lists, links, tables, fenced code, strikethrough, and task lists are included. Markup typed in the note is escaped and shown as text. Links may use http, https, mailto, a fragment, or a relative address. A document that is already an HTML page is still written through unchanged, before any Markdown rendering. The rendered page uses a light background. Windows still adds a UTF-8 BOM around that page.
+
+## Markdown export
+
+- File → Export as Markdown writes a `.md` file and leaves the open document unchanged.
+- Plain text is converted. The Markdown shows the same words and line breaks. Characters that Markdown would treat as formatting, headings, or lists are escaped, and tabs are written as spaces. The file keeps the document's encoding, byte-order mark, and line-ending policy. A document whose syntax language is Markdown is written as typed.
+- Rich text is converted. Bold, italic, and bold italic become `**`, `*`, and `***`. Strikethrough becomes `~~`. Underline becomes `<u>…</u>`. Links become `[label](url)`. Bullet lists become `-` items and numbered lists become `1.` items. Items in the same list stay on consecutive lines, including a nested item under its parent. A bullet list followed by a numbered list is separated by a blank line. Tables become pipe tables. Paragraphs are separated by a blank line.
+- Font, color, and alignment are not written. A rich-text Markdown file is UTF-8 without a BOM, with LF line endings.
+
+## Markdown
+
+- `.md`, `.markdown`, and `.mdown` open as Markdown.
+- View → Markdown Preview (⌘⇧M on macOS, Ctrl+Shift+M on Windows) shows the rendered note beside the editor. The preview is off until you turn it on, and each tab remembers its own setting. It follows the editor theme.
+- Preview is unavailable above the 500,000-character large-document threshold. The pane then shows a short notice.
+
 ## Word wrap
 
 - When wrap is enabled, lines break at the window edge, including long words with no spaces.
@@ -29,7 +52,7 @@ The two TextPad editions do not share source code, but they should agree on thes
 ## Large documents
 
 - Files up to 256 MB may be opened, subject to available memory.
-- Syntax coloring and visual embellishments may be disabled above the large-document threshold.
+- Syntax coloring, Markdown preview, and visual embellishments may be disabled above the large-document threshold.
 - Opening should not force complete document layout before the first viewport appears.
 - Large documents should not produce autosave snapshots above the snapshot limit.
 - Word wrap still follows the user setting on large documents.

@@ -56,21 +56,23 @@ enum LineEnding: String, CaseIterable {
         var hasCR = false
         var hasCRLF = false
 
-        var index = text.startIndex
-        while index < text.endIndex {
-            let char = text[index]
-            if char == "\r" {
-                let next = text.index(after: index)
-                if next < text.endIndex, text[next] == "\n" {
+        // Swift treats CR+LF as one Character, so walk scalars or a CRLF file looks empty of newlines.
+        let scalars = text.unicodeScalars
+        var index = scalars.startIndex
+        while index < scalars.endIndex {
+            let value = scalars[index].value
+            if value == 13 {
+                let next = scalars.index(after: index)
+                if next < scalars.endIndex, scalars[next].value == 10 {
                     hasCRLF = true
-                    index = text.index(after: next)
+                    index = scalars.index(after: next)
                     continue
                 }
                 hasCR = true
-            } else if char == "\n" {
+            } else if value == 10 {
                 hasLF = true
             }
-            index = text.index(after: index)
+            index = scalars.index(after: index)
         }
 
         if hasCRLF && (hasCR || hasLF) { return .mixed }
@@ -79,6 +81,27 @@ enum LineEnding: String, CaseIterable {
         if hasCR { return .cr }
         if hasLF { return .lf }
         return .lf
+    }
+
+    /// 1-based line number at a UTF-16 offset. CR, LF, and CRLF each end one line.
+    static func lineNumber(at location: Int, in text: NSString) -> Int {
+        let end = min(max(location, 0), text.length)
+        guard end > 0 else { return 1 }
+        var line = 1
+        var index = 0
+        while index < end {
+            let codeUnit = text.character(at: index)
+            if codeUnit == 0x0A {
+                line += 1
+            } else if codeUnit == 0x0D {
+                let next = index + 1
+                if next >= end || text.character(at: next) != 0x0A {
+                    line += 1
+                }
+            }
+            index += 1
+        }
+        return line
     }
 
     static func editMayAffectLineEndings(editedRange: NSRange, delta: Int, in text: NSString) -> Bool {
@@ -232,6 +255,8 @@ enum DocumentEncodingSupport {
 
     private static func bom(for encoding: String.Encoding) -> Data? {
         switch encoding {
+        case .utf8:
+            return Data([0xEF, 0xBB, 0xBF])
         case .utf16LittleEndian:
             return Data([0xFF, 0xFE])
         case .utf16BigEndian:

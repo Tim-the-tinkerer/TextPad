@@ -1,5 +1,4 @@
 using System.IO;
-using System.Net;
 using System.Printing;
 using System.Text;
 using System.Windows;
@@ -42,7 +41,8 @@ public static class DocumentExport
         FrameworkElement owner,
         RichTextBox? editor,
         string title,
-        string plainText)
+        string plainText,
+        bool renderMarkdown = false)
     {
         var safeTitle = string.IsNullOrWhiteSpace(title) ? "Document" : title;
         var dialog = new SaveFileDialog
@@ -57,7 +57,7 @@ public static class DocumentExport
         {
             var html = editor is not null
                 ? BuildHtmlFromRichText(editor, safeTitle)
-                : BuildHtmlFromPlainText(plainText, safeTitle);
+                : BuildHtmlFromPlainText(plainText, safeTitle, renderMarkdown);
 
             AtomicFileWriter.WriteAllBytes(
                 dialog.FileName,
@@ -87,16 +87,81 @@ public static class DocumentExport
         return WrapHtmlDocument(body, title);
     }
 
-    private static string BuildHtmlFromPlainText(string text, string title)
+    private static string BuildHtmlFromPlainText(string text, string title, bool renderMarkdown = false)
     {
-        var normalized = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
-        var body = $"<pre>{WebUtility.HtmlEncode(normalized)}</pre>";
+        var source = text ?? string.Empty;
+        // A pasted web page is the document. Write it through so a browser
+        // runs it, instead of showing the source inside a <pre> page.
+        if (IsStandaloneHtmlDocument(source))
+            return source;
+
+        if (renderMarkdown)
+            return Markdown.HtmlDocument(source, title, Markdown.PageStyle.Export);
+
+        var normalized = source.Replace("\r\n", "\n").Replace('\r', '\n');
+        var body = $"<pre>{Markdown.Escape(normalized)}</pre>";
         return WrapHtmlDocument(body, title);
+    }
+
+    /// <summary>
+    /// True when the text is itself an HTML document: optional BOM, whitespace,
+    /// comments, or an XML declaration, then <c>&lt;!DOCTYPE html</c> or <c>&lt;html</c>.
+    /// </summary>
+    private static bool IsStandaloneHtmlDocument(string text)
+    {
+        var rest = text.AsSpan();
+        if (!rest.IsEmpty && rest[0] == '\uFEFF')
+            rest = rest[1..];
+
+        while (true)
+        {
+            rest = rest.TrimStart();
+            if (rest.StartsWith("<!--"))
+            {
+                var end = rest.IndexOf("-->");
+                if (end < 0)
+                    return false;
+                rest = rest[(end + 3)..];
+                continue;
+            }
+
+            if (rest.StartsWith("<?"))
+            {
+                var end = rest.IndexOf("?>");
+                if (end < 0)
+                    return false;
+                rest = rest[(end + 2)..];
+                continue;
+            }
+
+            break;
+        }
+
+        if (rest.StartsWith("<!doctype", StringComparison.OrdinalIgnoreCase))
+        {
+            rest = rest["<!doctype".Length..].TrimStart();
+            if (!rest.StartsWith("html", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (rest.Length == 4)
+                return true;
+            var following = rest[4];
+            return char.IsWhiteSpace(following) || following == '>';
+        }
+
+        if (rest.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+        {
+            if (rest.Length == 5)
+                return true;
+            var following = rest[5];
+            return char.IsWhiteSpace(following) || following == '>';
+        }
+
+        return false;
     }
 
     private static string WrapHtmlDocument(string body, string title)
     {
-        var escapedTitle = WebUtility.HtmlEncode(title);
+        var escapedTitle = Markdown.Escape(title);
         if (body.Contains("<html", StringComparison.OrdinalIgnoreCase))
             return body;
 

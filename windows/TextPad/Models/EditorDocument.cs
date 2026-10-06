@@ -152,7 +152,11 @@ public sealed class EditorDocument
         if (string.IsNullOrEmpty(text))
             return LineEndingKind.Unknown;
 
-        var sample = text.Length <= LineEndingSampleSize ? text : text[..LineEndingSampleSize];
+        // Keep a CRLF pair that straddles the sample boundary, or a pure CRLF file looks mixed.
+        var sampleLength = Math.Min(text.Length, LineEndingSampleSize);
+        if (sampleLength > 0 && sampleLength < text.Length && text[sampleLength - 1] == '\r' && text[sampleLength] == '\n')
+            sampleLength++;
+        var sample = text[..sampleLength];
         var hasLf = sample.Contains('\n');
         var hasCr = sample.Contains('\r');
         if (!hasLf && !hasCr) return LineEndingKind.Unknown;

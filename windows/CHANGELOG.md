@@ -1,5 +1,50 @@
 # TextPad (Windows) Changelog
 
+## 1.5.12 — 2026-10-05
+
+### Fixed
+- Export as Markdown keeps CRLF or CR when the line-ending policy is Preserve.
+- Plain-text HTML export leaves apostrophes as typed.
+- A numbered list exported from rich text keeps its starting number.
+- A Markdown list marker that is not an ASCII number no longer stops preview or HTML export.
+- Line-ending detection keeps a CRLF pair that falls across the sample boundary.
+- CR-only files count as separate lines when deciding whether to show line numbers.
+
+## 1.5.11 — 2026-10-05
+
+### Changed
+- **Export as Markdown** converts plain text into Markdown that shows the same words and line breaks. Characters Markdown would treat as formatting are escaped. A note whose syntax language is already Markdown is written as typed.
+
+## 1.5.10 — 2026-10-05
+
+### Added
+- **Export as Markdown** writes a `.md` file. Plain text is copied with the document's encoding and line endings. Rich text becomes Markdown: bold, italic, strikethrough, underline, lists, links, and tables. The rich-text file is UTF-8 without a BOM.
+
+### Changed
+- **Export as HTML** renders Markdown only when the syntax language is Markdown.
+
+## 1.5.9 — 2026-10-05
+
+### Changed
+- **Export as HTML** renders plain text that is Markdown, including a note that is not saved as `.md`. A lone bullet list stays preformatted text. Code files stay preformatted text.
+
+## 1.5.8 — 2026-10-05
+
+### Added
+- **Markdown Preview** (Ctrl+Shift+M) shows the rendered note beside the editor. It follows the editor theme and stays off until you open it. Documents over 500,000 characters show a short notice.
+- `.md`, `.markdown`, and `.mdown` are recognized as Markdown. The optional Open With registration includes those extensions.
+
+### Changed
+- **Export as HTML** renders a plain-text Markdown note. A document that is already an HTML page is still written through unchanged. The Windows file remains UTF-8 with a BOM.
+
+## 1.5.7 — 2026-10-05
+
+### Fixed
+- **Export as HTML** writes a plain-text document through unchanged when it is already an HTML page (`<!DOCTYPE html>` or `<html>`, after optional blank lines, comments, or an XML declaration). Browsers run that page instead of showing the source inside `<pre>`. Notes and fragments still export as escaped text.
+
+### Changed
+- The About box and help no longer name other editors. Help describes when an HTML export is written through and when it stays escaped text. Windows HTML export is UTF-8 with a BOM.
+
 ## 1.5.6 — 2026-09-13
 
 ### Added

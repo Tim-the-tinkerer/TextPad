@@ -22,7 +22,7 @@ enum SyntaxLanguage: String, CaseIterable {
         case "html", "htm": return .html
         case "css", "scss": return .css
         case "json": return .json
-        case "md", "markdown": return .markdown
+        case "md", "markdown", "mdown": return .markdown
         case "sh", "bash", "zsh": return .shell
         case "c", "h", "cpp", "hpp", "m", "mm": return .c
         default: return .plain
@@ -439,12 +439,16 @@ final class SyntaxHighlighter {
                 literals: [(jsonString, c.string)]
             )
         case .markdown:
-            let heading = #"(?m)^#{1,6}\s+.+$"#
-            let code = #"`[^`]+`"#
-            let link = #"\[[^\]]+\]\([^)]+\)"#
+            let heading = #"(?m)^#{1,6}(?:\s+.*)?$"#
+            let emphasis = #"\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|~~[^~\n]+~~"#
+            let link = #"!?\[[^\]]+\]\([^)]+\)"#
+            let quote = #"(?m)^>\s?.*$"#
+            let list = #"(?m)^[ \t]*(?:[-*+]|\d+[.)])\s+"#
+            let fence = #"(?s)```[^\n]*\n.*?```|~~~[^\n]*\n.*?~~~"#
+            let code = #"`[^`\n]+`"#
             return SyntaxPatternSet(
-                code: [(heading, c.keyword), (link, c.type), (#"(?m)^>\s+.+$"#, c.comment)],
-                literals: [(code, c.string)]
+                code: [(heading, c.keyword), (emphasis, c.markup), (link, c.type), (quote, c.comment), (list, c.number)],
+                literals: [(fence, c.string), (code, c.string)]
             )
         case .shell:
             let kw = #"\b(?:if|then|else|elif|fi|for|do|done|while|case|esac|function|return|exit|export|source|local|readonly)\b"#

@@ -56,7 +56,7 @@ final class LineNumberGutterView: NSView {
 
         var lineNumber = 1
         if charRange.location > 0 {
-            lineNumber = text.substring(to: charRange.location).components(separatedBy: "\n").count
+            lineNumber = LineEnding.lineNumber(at: charRange.location, in: text)
         }
 
         var index = charRange.location

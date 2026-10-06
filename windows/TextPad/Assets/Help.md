@@ -2,7 +2,7 @@
 
 TextPad is a lightweight **64-bit** text editor for Windows. It handles everyday plain-text and rich-text editing, syntax highlighting, large files, and multi-tab workflows.
 
-**Version 1.5.6**
+**Version 1.5.12**
 
 ---
 
@@ -34,7 +34,8 @@ Only one TextPad window runs at a time. Opening TextPad again (or double-clickin
 | Document Encoding | — | Change encoding for the current plain-text document |
 | Print | Ctrl+P | Print the active document |
 | Export as PDF | — | Export plain or rich text to PDF |
-| Export as HTML | — | Export to a standalone HTML file |
+| Export as HTML | — | Write an HTML page through unchanged. A Markdown note is rendered. Other plain text becomes a simple page; rich text keeps formatting |
+| Export as Markdown | — | Write a `.md` file. Plain text becomes Markdown. Rich text becomes Markdown |
 | Exit | Alt+F4 | Quit TextPad |
 
 ### Supported formats
@@ -48,7 +49,7 @@ Plain-text documents support UTF-8, UTF-8 with BOM, UTF-16 LE/BE, ASCII, ISO Lat
 
 ### Line endings
 
-The status bar shows **LF**, **CRLF**, **CR**, or **Mixed** for plain-text files. Set the default for new saves in **View → Preferences → Line endings on save** (Preserve, LF, or CRLF).
+The status bar shows **LF**, **CRLF**, **CR**, or **Mixed** for plain-text files. Pressing Return inserts that ending. A mixed file inserts LF. Set the default for new saves in **View → Preferences → Line endings on save** (Preserve, LF, or CRLF). A UTF-8 file that was opened with a byte-order mark is saved with that mark.
 
 ---
 
@@ -101,6 +102,7 @@ Available when the document is rich text (RTF):
 | Line Numbers | Show or hide the gutter |
 | Show Invisibles | Display spaces, tabs, and line endings |
 | Highlight Current Line | Shade the line containing the caret |
+| Markdown Preview | Ctrl+Shift+M — render the Markdown note beside the editor |
 | Syntax Highlighting | Auto-detect or pick a language manually |
 | Themes | Light, Dark, Solarized, Sepia, or System |
 | Preferences | Editor settings (see below) |
@@ -152,6 +154,7 @@ Preferences are stored in:
 - Files over **256 MB** cannot be opened.
 - Word wrap, when enabled, wraps at the window edge, including extremely long lines.
 - Syntax highlighting is disabled for documents over **500,000 characters** to keep the UI responsive.
+- Markdown preview is unavailable above that same size and shows a short notice instead.
 - Very large single-line files (for example multi-megabyte JSON or data exports) open without freezing the UI. Plain-text files load on a background thread; the tab title shows a loading indicator until content is ready.
 
 ---
@@ -178,7 +181,8 @@ If a file open in TextPad is modified, deleted, or moved on disk, you are notifi
 
 - **Print** — Sends the document to the system print dialog.
 - **Export as PDF** — Plain text is rendered to PDF; rich text keeps formatting where possible.
-- **Export as HTML** — Rich text exports as HTML; plain text as a simple HTML page.
+- **Export as Markdown** — Writes a `.md` file without changing the open document. Plain text becomes Markdown that shows the same words and line breaks. Characters Markdown would treat as formatting, headings, or lists are escaped, and the file keeps the document's encoding and line endings. Set the syntax language to Markdown when the note is already Markdown; TextPad then writes it as typed. Rich text becomes Markdown: bold, italic, strikethrough, lists, links, and tables. Underline is written as `<u>…</u>`. Font, color, and alignment are left out. A rich-text Markdown file is UTF-8 without a byte-order mark.
+- **Export as HTML** — Rich text exports as formatted HTML on a white page. A plain-text Markdown note is rendered: headings, lists, links, tables, and fenced code become a page, and tags typed in the note stay visible as text. Other plain text that is not an HTML page exports as a simple page: the text sits in a preformatted block, and `<`, `>`, `&`, and quotes are escaped. Plain text that is already an HTML page is written unchanged, so a browser runs it. That page may start with blank lines, comments, or an XML declaration, and then `<!DOCTYPE html>` or `<html>`. A note that only mentions those tags later, or a fragment that starts with another element such as `<div>`, still exports as escaped text. The Windows file is UTF-8 with a byte-order mark. Saving the document is separate from this command. Use **Save** or **Save As** when you want the editor text written as a file. The rendered page uses a light background. Preview, under View → Markdown Preview, follows the editor theme.
 
 ---
 
@@ -247,6 +251,7 @@ Paths with spaces should be quoted. Additional launches forward files to the run
 ### View
 - Ctrl++ / Ctrl+- — Zoom in / out
 - Ctrl+\\ — Toggle word wrap
+- Ctrl+Shift+M — Markdown preview
 
 ### Window
 - Ctrl+Tab / Ctrl+Shift+Tab — Next / previous tab
@@ -269,6 +274,9 @@ Use File → Open with Encoding and pick the correct encoding, or File → Docum
 **RTF text is faint or hard to read**  
 Email receipts and similar RTF files often use light gray or near-black body text. TextPad remaps that ink to the current theme so it stays readable. Switch themes if a document still looks wrong.
 
+**A pasted web page shows up as source code in the browser**  
+**Export as HTML** used to wrap that source in another page. Export it again from plain text. The document needs to start with `<!DOCTYPE html>` or `<html>` (blank lines and comments before that are fine). A rich-text document still exports as formatted HTML, not as the original source.
+
 **Slow or frozen on a huge file**  
 Very large and single-line files stay in the standard editor. TextPad automatically disables expensive presentation features when needed.
 
@@ -282,6 +290,6 @@ Check `%APPDATA%\com.textpad.editor\crash.log` for details after an error.
 
 ## About
 
-TextPad is inspired by BBEdit and CotEditor. See **Help → About TextPad** for the installed version number.
+See **Help → About TextPad** for the installed version number.
 
 © TextPad

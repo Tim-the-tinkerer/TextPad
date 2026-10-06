@@ -127,7 +127,7 @@ final class InWindowFindBar: NSView {
     }
 
     func prepare(with selection: String) {
-        if !selection.isEmpty, !selection.contains("\n") {
+        if !selection.isEmpty, !TextSearch.containsLineBreak(selection) {
             findField.stringValue = selection
         }
         findField.becomeFirstResponder()

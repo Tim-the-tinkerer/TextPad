@@ -110,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Export as PDF…", action: #selector(exportAsPDF), keyEquivalent: "")
         fileMenu.addItem(withTitle: "Export as HTML…", action: #selector(exportAsHTML), keyEquivalent: "")
+        fileMenu.addItem(withTitle: "Export as Markdown…", action: #selector(exportAsMarkdown), keyEquivalent: "")
         let fileItem = NSMenuItem()
         fileItem.submenu = fileMenu
         mainMenu.addItem(fileItem)
@@ -170,6 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(withTitle: "Toggle Word Wrap", action: #selector(toggleWordWrap), keyEquivalent: "\\")
         viewMenu.addItem(withTitle: "Toggle Invisibles", action: #selector(toggleInvisibles), keyEquivalent: "i").keyEquivalentModifierMask = [.command, .option]
         viewMenu.addItem(withTitle: "Toggle Current Line Highlight", action: #selector(toggleCurrentLineHighlight), keyEquivalent: "")
+        viewMenu.addItem(withTitle: "Markdown Preview", action: #selector(toggleMarkdownPreview), keyEquivalent: "m").keyEquivalentModifierMask = [.command, .shift]
         viewMenu.addItem(NSMenuItem.separator())
         let langMenu = NSMenu()
         for lang in SyntaxLanguage.allCases {
@@ -272,7 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowsOtherFileTypes = true
-        panel.allowedContentTypes = [.plainText, .rtf, .sourceCode, .json, .html, .xml, .script, .data]
+        panel.allowedContentTypes = textDocumentTypes(includingRTF: true)
         panel.begin { response in
             guard response == .OK else { return }
             for url in panel.urls {
@@ -319,7 +321,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowsOtherFileTypes = true
-        panel.allowedContentTypes = [.plainText, .sourceCode, .json, .html, .xml, .script, .data]
+        panel.allowedContentTypes = textDocumentTypes(includingRTF: false)
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             let controller = EncodingOptionsController(mode: .open)
@@ -518,6 +520,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         EditorPreferences.shared.showInvisibles.toggle()
     }
 
+    @objc private func toggleMarkdownPreview(_ sender: Any?) {
+        activeWindow()?.currentEditor?.toggleMarkdownPreview()
+    }
+
     @objc private func toggleCurrentLineHighlight(_ sender: Any?) {
         EditorPreferences.shared.showCurrentLineHighlight.toggle()
     }
@@ -698,6 +704,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let data: Data
             if editor.document.isRichText {
                 data = try RichTextFormatting.htmlData(from: editor.activeTextView)
+            } else if editor.document.language == .markdown,
+                      let markdownData = DocumentExport.htmlData(fromMarkdown: editor.document.content, title: title) {
+                data = markdownData
             } else if let plainData = DocumentExport.htmlData(fromPlainText: editor.document.content, title: title) {
                 data = plainData
             } else {
@@ -709,6 +718,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             showError("Could not export", error.localizedDescription)
         }
+    }
+
+    @objc private func exportAsMarkdown(_ sender: Any?) {
+        guard let editor = activeWindow()?.currentEditor else { return }
+        editor.syncDocument()
+
+        let panel = NSSavePanel()
+        if let markdownType = UTType(filenameExtension: "md") {
+            panel.allowedContentTypes = [markdownType]
+        }
+        panel.nameFieldStringValue = defaultExportName(for: editor, extension: "md")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data: Data
+            if editor.document.isRichText {
+                let storage = editor.activeTextView.textStorage ?? NSAttributedString()
+                let markdown = MarkdownExport.markdown(from: storage)
+                guard let encoded = markdown.data(using: .utf8) else {
+                    throw NSError(domain: "TextPad", code: 6, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to encode Markdown."
+                    ])
+                }
+                data = encoded
+            } else {
+                let markdown = editor.document.language == .markdown
+                    ? editor.document.content
+                    : MarkdownExport.applyingSourceLineEndings(
+                        MarkdownExport.markdown(fromPlainText: editor.document.content),
+                        source: editor.document.content
+                    )
+                data = try encodedMarkdownExport(markdown, from: editor)
+            }
+            try data.write(to: url, options: .atomic)
+        } catch {
+            showError("Could not export", error.localizedDescription)
+        }
+    }
+
+    private func encodedMarkdownExport(_ text: String, from editor: EditorViewController) throws -> Data {
+        func payload(_ value: String) -> Data? {
+            DocumentEncodingSupport.encode(
+                value,
+                encoding: editor.document.encoding,
+                lineEndingPolicy: editor.document.lineEndingPolicy,
+                originalLineEnding: editor.document.lineEnding,
+                includeBOM: editor.document.writesByteOrderMark
+            )
+        }
+        if let encoded = payload(text) { return encoded }
+        let withoutIndent = text.replacingOccurrences(of: "\u{00A0}", with: " ")
+        if withoutIndent != text, let encoded = payload(withoutIndent) { return encoded }
+        throw NSError(domain: "TextPad", code: 6, userInfo: [
+            NSLocalizedDescriptionKey: "Unable to encode Markdown."
+        ])
+    }
+
+    private func textDocumentTypes(includingRTF: Bool) -> [UTType] {
+        var types: [UTType] = [.plainText, .sourceCode, .json, .html, .xml, .script, .data]
+        if includingRTF {
+            types.append(.rtf)
+        }
+        for identifier in ["net.daringfireball.markdown", "public.markdown"] {
+            if let markdown = UTType(identifier) {
+                types.append(markdown)
+            }
+        }
+        if let markdown = UTType(filenameExtension: "md") {
+            types.append(markdown)
+        }
+        return types
     }
 
     private func defaultExportName(for editor: EditorViewController, extension ext: String) -> String {
@@ -747,11 +827,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.6"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.12"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "TextPad",
             .applicationVersion: version,
-            .credits: NSAttributedString(string: "A lightweight text editor for macOS.\nInspired by BBEdit and CotEditor.")
+            .credits: NSAttributedString(string: "A lightweight text editor for macOS.")
         ])
     }
 
@@ -806,6 +886,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case #selector(toggleWordWrap(_:)):
             menuItem.state = EditorPreferences.shared.wordWrap ? .on : .off
             return hasEditor
+        case #selector(toggleMarkdownPreview(_:)):
+            menuItem.state = editor?.isMarkdownPreviewVisible == true ? .on : .off
+            return hasEditor
         case #selector(newTab(_:)), #selector(closeTab(_:)), #selector(closeWindow(_:)),
              #selector(saveDocumentAction(_:)), #selector(saveDocumentAsAction(_:)),
              #selector(printDocument(_:)),
@@ -825,7 +908,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
              #selector(toggleNumberedList(_:)), #selector(increaseIndent(_:)),
              #selector(decreaseIndent(_:)), #selector(makeRichText(_:)):
             return hasEditor
-        case #selector(exportAsPDF(_:)), #selector(exportAsHTML(_:)):
+        case #selector(exportAsPDF(_:)), #selector(exportAsHTML(_:)), #selector(exportAsMarkdown(_:)):
             return hasEditor
         case #selector(makePlainText(_:)):
             return hasEditor && editor?.document.isRichText == true

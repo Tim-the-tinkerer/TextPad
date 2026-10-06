@@ -263,6 +263,7 @@
                 <MenuItem Header="_Print…" InputGestureText="Ctrl+P" Click="Print_Click"/>
                 <MenuItem Header="Export as _PDF…" Click="ExportPdf_Click"/>
                 <MenuItem Header="Export as _HTML…" Click="ExportHtml_Click"/>
+                <MenuItem Header="Export as _Markdown…" Click="ExportMarkdown_Click"/>
                 <Separator/>
                 <MenuItem Header="E_xit" InputGestureText="Alt+F4" Click="Exit_Click"/>
             </MenuItem>
@@ -310,6 +311,7 @@
                 <MenuItem x:Name="LineNumbersItem" Header="_Line Numbers" IsCheckable="True" Click="LineNumbers_Click"/>
                 <MenuItem x:Name="InvisiblesItem" Header="Show _Invisibles" IsCheckable="True" Click="Invisibles_Click"/>
                 <MenuItem x:Name="CurrentLineItem" Header="_Highlight Current Line" IsCheckable="True" Click="CurrentLine_Click"/>
+                <MenuItem x:Name="MarkdownPreviewItem" Header="_Markdown Preview" InputGestureText="Ctrl+Shift+M" IsCheckable="True" Click="MarkdownPreview_Click"/>
                 <Separator/>
                 <MenuItem Header="_Syntax Highlighting">
                     <MenuItem Header="_Auto" Click="SyntaxAuto_Click"/>
